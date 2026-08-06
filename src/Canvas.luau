@@ -136,6 +136,11 @@ function Canvas:create(kind: string, properties: Properties?, options: CreateOpt
 		object,
 		canvas._sequence,
 		options ~= nil and options.interactive == true,
+		function(changed: Element, interactive: boolean)
+			if not interactive then
+				canvas._router:releaseElement(changed)
+			end
+		end,
 		function()
 			if canvas._focused == element then
 				canvas:focus(nil)

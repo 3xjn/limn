@@ -33,6 +33,7 @@ type PrivateElement = Element & {
 	_object: any,
 	_sequence: number,
 	_interactive: boolean,
+	_onInteractiveChanged: (Element, boolean) -> (),
 	_focusable: boolean,
 	_alive: boolean,
 	_onDestroy: (Element) -> (),
@@ -46,6 +47,7 @@ function Element.new(
 	object: any,
 	sequence: number,
 	interactive: boolean,
+	onInteractiveChanged: (Element, boolean) -> (),
 	onDestroy: (Element) -> ()
 ): Element
 	return setmetatable({
@@ -62,6 +64,7 @@ function Element.new(
 		_object = object,
 		_sequence = sequence,
 		_interactive = interactive,
+		_onInteractiveChanged = onInteractiveChanged,
 		_focusable = false,
 		_alive = true,
 		_onDestroy = onDestroy,
@@ -97,7 +100,11 @@ end
 function Element:setInteractive(interactive: boolean): Element
 	local self = self :: PrivateElement
 	assert(self._alive, "cannot update a destroyed element")
+	if self._interactive == interactive then
+		return self
+	end
 	self._interactive = interactive
+	self._onInteractiveChanged(self, interactive)
 	return self
 end
 

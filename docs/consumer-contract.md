@@ -15,7 +15,7 @@ controls, themes, targeting logic, or game-specific drawings.
 local runtime = Limn.new({
 	Drawing = Drawing,
 	DrawingImmediate = DrawingImmediate, -- optional
-	Vector2 = Vector2, -- required only by bindInput()
+	Vector2 = Vector2, -- required by bindInput() and retained controls
 	SupportsPrimitive = supportsPrimitive, -- optional
 	Input = { -- optional
 		Processed = "ignore", -- "ignore" by default, or "allow"
@@ -168,10 +168,11 @@ end)
 ```
 
 Segmented controls expose `Changed`, `StateChanged`, `getValue()`, `getState()`, `setValue(value)`,
-`setDisabled(boolean)`, and `destroy()`. Options are focusable retained squares: arrow keys move
-focus; Enter or Space activates the focused option. The default layout divides the supplied bounds
-horizontally. To supply layout, set `Layout(index, count, position, size)` to return `Position`,
-`Size`, and optionally `LabelPosition`.
+`setDisabled(boolean)`, `setLayout(layout)`, `setVisible(boolean)`, and `destroy()`. Options are
+focusable retained squares: arrow keys move focus; Enter or Space activates the focused option. The
+default layout divides the supplied bounds horizontally. `setLayout` replaces geometry completely:
+it requires `Position` and `Size`, and its optional `Layout(index, count, position, size)` returns
+`Position`, `Size`, and optionally `LabelPosition`; omitting `Layout` restores the default.
 
 ```luau
 local shortcut = runtime:createKeybindControl(canvas, {
@@ -190,9 +191,16 @@ local shortcut = runtime:createKeybindControl(canvas, {
 
 Keybind controls expose `Changed`, `ListeningChanged`, `StateChanged`, `getValue()`,
 `getDisplayValue()`, `getState()`, `setValue(value)`, `begin()`, `cancel()`, `clear()`,
-`setDisabled(boolean)`, and `destroy()`. Click, Enter, or Space begins listening. Limn stores the
-canonical `KeyCode.Name` and also normalizes `Enum.KeyCode.Name` values. Escape cancels; Backspace
-or Delete clears. Keybind `Layout` accepts `LabelPosition` and `ValuePosition`.
+`setDisabled(boolean)`, `setLayout(layout)`, `setVisible(boolean)`, and `destroy()`. Click, Enter,
+or Space begins listening. Limn stores the canonical `KeyCode.Name` and also normalizes
+`Enum.KeyCode.Name` values. Escape cancels; Backspace or Delete clears. `setLayout` requires
+`Position` and `Size`; its optional `Layout` supplies `LabelPosition` and `ValuePosition`, and an
+omitted `Layout` restores the default.
+
+`setVisible(false)` hides every primitive owned by a control, releases its pointer capture and
+focus immediately, and prevents further pointer or keyboard input. A keybind also cancels listening
+without changing its value. Showing a control again retains only persistent value and disabled state;
+it does not restore focus, capture, or listening. These lifecycle operations never fire `Changed`.
 
 Provide labels through segmented `Options[].Label` and keybind `Label`, and provide retained drawing
 properties through style tables. The deterministic state overlays are `Frame`, `Option`,

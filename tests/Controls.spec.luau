@@ -152,6 +152,45 @@ return function()
 	input.InputBegan:Fire(key("Enter"), false)
 	assert(segmented:getValue() == "low")
 	segmented:setDisabled(false)
+	local layoutChanges = #changes
+	segmented:setLayout({
+		Position = Vector2.new(140, 10),
+		Size = Vector2.new(100, 60),
+		Layout = function(index: number)
+			return {
+				Position = Vector2.new(140, 10 + (index - 1) * 30),
+				Size = Vector2.new(100, 30),
+				LabelPosition = Vector2.new(150, 14 + (index - 1) * 30),
+			}
+		end,
+	})
+	assert(canvas:getElements()[2]:get("Position") == Vector2.new(140, 10))
+	assert(canvas:getElements()[2]:get("Size") == Vector2.new(100, 30))
+	assert(canvas:getElements()[5]:get("Position") == Vector2.new(150, 44))
+	assert(#changes == layoutChanges and segmented:getValue() == "low")
+	segmented:setLayout({
+		Position = Vector2.new(140, 10),
+		Size = Vector2.new(100, 20),
+	})
+	assert(canvas:getElements()[4]:get("Position") == Vector2.new(190, 10))
+	assert(canvas:getElements()[4]:get("Size") == Vector2.new(50, 20))
+	assert(#changes == layoutChanges)
+
+	canvas:dispatchPointer(pointer("down", 195, 15))
+	segmented:setVisible(false)
+	canvas:dispatchPointer(pointer("up", 195, 15))
+	assert(segmented:getValue() == "low" and #changes == layoutChanges)
+	assert(canvas:getFocusedElement() == nil)
+	for index = 1, 5 do
+		assert(canvas:getElements()[index]:get("Visible") == false)
+	end
+	segmented:setVisible(true)
+	assert(canvas:getElements()[2]:get("Visible") == true)
+	segmented:setDisabled(true)
+	segmented:setVisible(false)
+	segmented:setVisible(true)
+	assert(segmented:getState() == "disabled" and segmented:getValue() == "low")
+	segmented:setDisabled(false)
 
 	local keybind = runtime:createKeybindControl(canvas, {
 		Position = Vector2.new(10, 50),
@@ -206,10 +245,41 @@ return function()
 	input.InputBegan:Fire(key("F"), false)
 	assert(keybind:getValue() == nil)
 	keybind:setDisabled(false)
+	keybind:setLayout({
+		Position = Vector2.new(150, 50),
+		Size = Vector2.new(100, 24),
+		Layout = {
+			LabelPosition = Vector2.new(155, 54),
+			ValuePosition = Vector2.new(205, 54),
+		},
+	})
+	assert(canvas:getElements()[6]:get("Position") == Vector2.new(150, 50))
+	assert(canvas:getElements()[6]:get("Size") == Vector2.new(100, 24))
+	assert(canvas:getElements()[7]:get("Position") == Vector2.new(155, 54))
+	assert(canvas:getElements()[8]:get("Position") == Vector2.new(205, 54))
+	assert(#bindings == 2 and keybind:getValue() == nil)
 
-	canvas:dispatchPointer(pointer("down", 20, 60))
+	canvas:dispatchPointer(pointer("down", 160, 60))
+	keybind:setVisible(false)
+	canvas:dispatchPointer(pointer("up", 160, 60))
+	assert(keybind:getState() == "idle" and keybind:getValue() == nil)
+	assert(canvas:getFocusedElement() == nil)
+	for index = 6, 8 do
+		assert(canvas:getElements()[index]:get("Visible") == false)
+	end
+	keybind:setVisible(true)
+	keybind:begin()
+	assert(keybind:getState() == "listening")
+	keybind:setVisible(false)
+	assert(keybind:getState() == "idle" and keybind:getValue() == nil)
+	keybind:setDisabled(true)
+	keybind:setVisible(true)
+	assert(keybind:getState() == "disabled" and keybind:getValue() == nil)
+	keybind:setDisabled(false)
+
+	canvas:dispatchPointer(pointer("down", 160, 60))
 	keybind:destroy()
-	canvas:dispatchPointer(pointer("up", 20, 60))
+	canvas:dispatchPointer(pointer("up", 160, 60))
 	input.InputBegan:Fire(key("G"), false)
 	assert(#bindings == 2)
 

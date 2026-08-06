@@ -117,6 +117,13 @@ assert(segmented:getValue() == "high" and segmentedChanges == 1)
 input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Left" } }, false)
 input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Enter" } }, false)
 assert(segmented:getValue() == "low" and segmentedChanges == 2)
+segmented:setLayout({
+	Position = Vector2.new(8, 128),
+	Size = Vector2.new(120, 24),
+})
+segmented:setVisible(false)
+assert(segmented:getValue() == "low" and segmentedChanges == 2)
+segmented:setVisible(true)
 
 local keybind = runtime:createKeybindControl(canvas, {
 	Position = Vector2.new(8, 96),
@@ -150,6 +157,14 @@ input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Escape" 
 assert(keybind:getValue() == "Q")
 keybind:clear()
 assert(keybind:getValue() == nil)
+keybind:setLayout({
+	Position = Vector2.new(8, 160),
+	Size = Vector2.new(120, 24),
+})
+keybind:begin()
+keybind:setVisible(false)
+assert(keybind:getState() == "idle" and keybind:getValue() == nil)
+keybind:setVisible(true)
 input.InputBegan:Fire(mouse, true)
 input.InputEnded:Fire(mouse, true)
 paintSignal:Fire()
@@ -179,4 +194,6 @@ paintSignal:Fire()
 assert(clicks == 1)
 assert(capturedPaints == 1)
 assert(keybind:getValue() == nil)
-print("MANUAL PASS bundled controls -> focus -> keyboard rebind -> captured paint -> cleanup")
+print(
+	"MANUAL PASS bundled controls -> layout -> visibility -> keyboard rebind -> captured paint -> cleanup"
+)

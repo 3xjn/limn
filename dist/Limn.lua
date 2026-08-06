@@ -238,6 +238,7 @@ type PrivateElement = Element & {
 	_object: any,
 	_sequence: number,
 	_interactive: boolean,
+	_onInteractiveChanged: (Element, boolean) -> (),
 	_focusable: boolean,
 	_alive: boolean,
 	_onDestroy: (Element) -> (),
@@ -251,6 +252,7 @@ function Element.new(
 	object: any,
 	sequence: number,
 	interactive: boolean,
+	onInteractiveChanged: (Element, boolean) -> (),
 	onDestroy: (Element) -> ()
 ): Element
 	return setmetatable({
@@ -267,6 +269,7 @@ function Element.new(
 		_object = object,
 		_sequence = sequence,
 		_interactive = interactive,
+		_onInteractiveChanged = onInteractiveChanged,
 		_focusable = false,
 		_alive = true,
 		_onDestroy = onDestroy,
@@ -302,7 +305,11 @@ end
 function Element:setInteractive(interactive: boolean): Element
 	local self = self :: PrivateElement
 	assert(self._alive, "cannot update a destroyed element")
+	if self._interactive == interactive then
+		return self
+	end
 	self._interactive = interactive
+	self._onInteractiveChanged(self, interactive)
 	return self
 end
 
@@ -636,6 +643,11 @@ function Canvas:create(kind: string, properties: Properties?, options: CreateOpt
 		object,
 		canvas._sequence,
 		options ~= nil and options.interactive == true,
+		function(changed: Element, interactive: boolean)
+			if not interactive then
+				canvas._router:releaseElement(changed)
+			end
+		end,
 		function()
 			if canvas._focused == element then
 				canvas:focus(nil)
@@ -988,6 +1000,9 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 
 	local style = options.Style or {}
 	local values = options.Options
+	local position = options.Position
+	local size = options.Size
+	local layout = options.Layout
 	local selectedIndex = 1
 	for index, option in values do
 		if option.Value == options.Value then
@@ -996,6 +1011,7 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		end
 	end
 	local disabled = options.Disabled == true
+	local visible = true
 	local hoveredIndex: number? = nil
 	local focusedIndex: number? = nil
 	local destroyed = false
@@ -1005,11 +1021,10 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 	local connections = {}
 	local owned: { Element } = {}
 	local segments: { Element } = {}
+	local labels: { Element? } = {}
 
-	local frame = canvas:create(
-		"Square",
-		baseSquare(style.Frame, options.Position, options.Size, options.ZIndex or 0)
-	)
+	local frame =
+		canvas:create("Square", baseSquare(style.Frame, position, size, options.ZIndex or 0))
 	table.insert(owned, frame)
 
 	local control = {
@@ -1053,8 +1068,44 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		if disabled then
 			patch(segment, style.Disabled)
 		end
-		segment:setInteractive(not disabled)
-		segment:setFocusable(not disabled)
+		segment:setInteractive(not disabled and visible)
+		segment:setFocusable(not disabled and visible)
+		segment:set("Visible", visible)
+	end
+
+	local function segmentLayout(index: number): (any, any, any)
+		local defaultPosition =
+			vector2.new(position.X + size.X * ((index - 1) / #values), position.Y)
+		local defaultSize = vector2.new(size.X / #values, size.Y)
+		local custom = if layout then layout(index, #values, position, size) else nil
+		local segmentPosition = if custom and custom.Position
+			then custom.Position
+			else defaultPosition
+		local segmentSize = if custom and custom.Size then custom.Size else defaultSize
+		local labelPosition = if custom and custom.LabelPosition
+			then custom.LabelPosition
+			else segmentPosition
+		return segmentPosition, segmentSize, labelPosition
+	end
+
+	local function updateGeometry()
+		if frame:isAlive() then
+			frame:patch({ Position = position, Size = size, ZIndex = options.ZIndex or 0 })
+		end
+		for index, segment in segments do
+			local segmentPosition, segmentSize, labelPosition = segmentLayout(index)
+			if segment:isAlive() then
+				segment:patch({
+					Position = segmentPosition,
+					Size = segmentSize,
+					ZIndex = (options.ZIndex or 0) + 1,
+				})
+			end
+			local label = labels[index]
+			if label and label:isAlive() then
+				label:patch({ Position = labelPosition, ZIndex = (options.ZIndex or 0) + 2 })
+			end
+		end
 	end
 
 	local function updateAll()
@@ -1065,6 +1116,12 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 			patch(frame, style.Frame)
 			if disabled then
 				patch(frame, style.Disabled)
+			end
+			frame:set("Visible", visible)
+		end
+		for _, label in labels do
+			if label and label:isAlive() then
+				label:set("Visible", visible)
 			end
 		end
 		updateState()
@@ -1093,18 +1150,7 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 	end
 
 	for index, option in values do
-		local defaultPosition = vector2.new(
-			options.Position.X + options.Size.X * ((index - 1) / #values),
-			options.Position.Y
-		)
-		local defaultSize = vector2.new(options.Size.X / #values, options.Size.Y)
-		local layout = if options.Layout
-			then options.Layout(index, #values, options.Position, options.Size)
-			else nil
-		local segmentPosition = if layout and layout.Position
-			then layout.Position
-			else defaultPosition
-		local segmentSize = if layout and layout.Size then layout.Size else defaultSize
+		local segmentPosition, segmentSize, labelPosition = segmentLayout(index)
 		local segment = canvas:create(
 			"Square",
 			baseSquare(style.Option, segmentPosition, segmentSize, (options.ZIndex or 0) + 1),
@@ -1112,14 +1158,11 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 				interactive = not disabled,
 			}
 		)
-		segment:setFocusable(not disabled)
+		segment:setFocusable(not disabled and visible)
 		table.insert(owned, segment)
 		table.insert(segments, segment)
 
 		if option.Label ~= nil then
-			local labelPosition = if layout and layout.LabelPosition
-				then layout.LabelPosition
-				else segmentPosition
 			local label = canvas:create(
 				"Text",
 				baseText(
@@ -1130,6 +1173,7 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 				)
 			)
 			table.insert(owned, label)
+			labels[index] = label
 		end
 
 		connect(connections, segment.PointerEntered, function()
@@ -1194,6 +1238,36 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		updateAll()
 	end
 
+	function control:setLayout(nextLayout: any)
+		assert(type(nextLayout) == "table", "segmented control layout is required")
+		assert(
+			nextLayout.Position and nextLayout.Size,
+			"segmented control layout needs Position and Size"
+		)
+		if destroyed then
+			return
+		end
+		position = nextLayout.Position
+		size = nextLayout.Size
+		layout = nextLayout.Layout
+		updateGeometry()
+		updateAll()
+	end
+
+	function control:setVisible(nextVisible: boolean)
+		if destroyed or visible == nextVisible then
+			return
+		end
+		visible = nextVisible
+		if not visible then
+			hoveredIndex = nil
+			if focusedIndex then
+				canvas:focus(nil)
+			end
+		end
+		updateAll()
+	end
+
 	function control:destroy()
 		if destroyed then
 			return
@@ -1224,8 +1298,11 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 	)
 
 	local style = options.Style or {}
+	local position = options.Position
+	local size = options.Size
 	local layout = options.Layout or {}
 	local disabled = options.Disabled == true
+	local visible = true
 	local listening = false
 	local focused = false
 	local destroyed = false
@@ -1237,11 +1314,10 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 	local connections = {}
 	local owned: { Element } = {}
 	local zIndex = options.ZIndex or 0
-	local frame =
-		canvas:create("Square", baseSquare(style.Frame, options.Position, options.Size, zIndex), {
-			interactive = not disabled,
-		})
-	frame:setFocusable(not disabled)
+	local frame = canvas:create("Square", baseSquare(style.Frame, position, size, zIndex), {
+		interactive = not disabled,
+	})
+	frame:setFocusable(not disabled and visible)
 	table.insert(owned, frame)
 	local label: Element? = nil
 	if options.Label ~= nil then
@@ -1250,14 +1326,14 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 			baseText(
 				style.Label,
 				tostring(options.Label),
-				layout.LabelPosition or options.Position,
+				layout.LabelPosition or position,
 				zIndex + 1
 			)
 		)
 		table.insert(owned, label)
 	end
 	local displayPosition = layout.ValuePosition
-		or vector2.new(options.Position.X + options.Size.X * 0.5, options.Position.Y)
+		or vector2.new(position.X + size.X * 0.5, position.Y)
 	local display =
 		canvas:create("Text", baseText(style.Value, displayKey(value), displayPosition, zIndex + 1))
 	table.insert(owned, display)
@@ -1267,6 +1343,20 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 		ListeningChanged = listeningChanged,
 		StateChanged = stateChanged,
 	} :: any
+
+	local function updateGeometry()
+		if frame:isAlive() then
+			frame:patch({ Position = position, Size = size, ZIndex = zIndex })
+		end
+		if label and label:isAlive() then
+			label:patch({ Position = layout.LabelPosition or position, ZIndex = zIndex + 1 })
+		end
+		if display:isAlive() then
+			local nextDisplayPosition = layout.ValuePosition
+				or vector2.new(position.X + size.X * 0.5, position.Y)
+			display:patch({ Position = nextDisplayPosition, ZIndex = zIndex + 1 })
+		end
+	end
 
 	local function currentState(): string
 		if disabled then
@@ -1300,8 +1390,15 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 				patch(frame, style.Disabled)
 				patch(display, style.Disabled)
 			end
-			frame:setInteractive(not disabled)
-			frame:setFocusable(not disabled)
+			frame:setInteractive(not disabled and visible)
+			frame:setFocusable(not disabled and visible)
+			frame:set("Visible", visible)
+		end
+		if label and label:isAlive() then
+			label:set("Visible", visible)
+		end
+		if display:isAlive() then
+			display:set("Visible", visible)
 		end
 		local nextState = currentState()
 		if nextState ~= state then
@@ -1348,7 +1445,7 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 	end
 
 	function control:begin(): boolean
-		if destroyed or disabled or listening then
+		if destroyed or disabled or not visible or listening then
 			return false
 		end
 		canvas:focus(frame)
@@ -1380,6 +1477,36 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 		end
 		disabled = nextDisabled
 		if disabled then
+			cancel()
+			if canvas:getFocusedElement() == frame then
+				canvas:focus(nil)
+			end
+		end
+		update()
+	end
+
+	function control:setLayout(nextLayout: any)
+		assert(type(nextLayout) == "table", "keybind control layout is required")
+		assert(
+			nextLayout.Position and nextLayout.Size,
+			"keybind control layout needs Position and Size"
+		)
+		if destroyed then
+			return
+		end
+		position = nextLayout.Position
+		size = nextLayout.Size
+		layout = nextLayout.Layout or {}
+		updateGeometry()
+		update()
+	end
+
+	function control:setVisible(nextVisible: boolean)
+		if destroyed or visible == nextVisible then
+			return
+		end
+		visible = nextVisible
+		if not visible then
 			cancel()
 			if canvas:getFocusedElement() == frame then
 				canvas:focus(nil)
@@ -1422,7 +1549,7 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 		control:begin()
 	end)
 	connect(connections, frame.KeyDown, function(_: any, key: string)
-		if disabled then
+		if disabled or not visible then
 			return
 		end
 		if not listening then
