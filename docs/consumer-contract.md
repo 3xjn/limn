@@ -24,11 +24,13 @@ local runtime = Limn.new({
 })
 ```
 
-The consumer-facing runtime has two methods:
+The consumer-facing runtime has four methods:
 
 ```luau
 runtime:supportsPrimitive(kind: string): boolean
 runtime:createCanvas(): Canvas
+runtime:createSegmentedControl(canvas: Canvas, options): SegmentedControl
+runtime:createKeybindControl(canvas: Canvas, options): KeybindControl
 ```
 
 `supportsPrimitive()` caches its result. Without `SupportsPrimitive`, Limn detects availability by
