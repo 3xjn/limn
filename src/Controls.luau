@@ -210,6 +210,7 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 				label:set("Visible", visible)
 			end
 		end
+		updateGeometry()
 		updateState()
 	end
 
@@ -336,7 +337,6 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		position = nextLayout.Position
 		size = nextLayout.Size
 		layout = nextLayout.Layout
-		updateGeometry()
 		updateAll()
 	end
 
@@ -486,6 +486,7 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 		if display:isAlive() then
 			display:set("Visible", visible)
 		end
+		updateGeometry()
 		local nextState = currentState()
 		if nextState ~= state then
 			state = nextState
@@ -583,7 +584,6 @@ function Controls.createKeybind(canvas: Canvas, options: any, vector2: any): any
 		position = nextLayout.Position
 		size = nextLayout.Size
 		layout = nextLayout.Layout or {}
-		updateGeometry()
 		update()
 	end
 

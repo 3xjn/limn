@@ -95,6 +95,14 @@ return function()
 	focusTarget:destroy()
 	assert(canvas:getFocusedElement() == nil and focusLost == 1)
 
+	local segmentedStyle = {
+		Frame = { Color = "frame" },
+		Option = { Color = "option" },
+		Selected = { Color = "selected" },
+		Focused = { Transparency = 0.8 },
+		Disabled = { Transparency = 0.2 },
+		Label = { Color = "label" },
+	}
 	local segmented = runtime:createSegmentedControl(canvas, {
 		Position = Vector2.new(10, 10),
 		Size = Vector2.new(120, 24),
@@ -104,15 +112,12 @@ return function()
 			{ Value = "high", Label = "High" },
 		},
 		Value = "low",
-		Style = {
-			Frame = { Color = "frame" },
-			Option = { Color = "option" },
-			Selected = { Color = "selected" },
-			Focused = { Transparency = 0.8 },
-			Disabled = { Transparency = 0.2 },
-			Label = { Color = "label" },
-		},
+		Style = segmentedStyle,
 	})
+	local segmentedPointerDown = 0
+	canvas:getElements()[4].PointerDown:Connect(function()
+		segmentedPointerDown += 1
+	end)
 
 	local changes = {}
 	segmented.Changed:Connect(function(value, previous, source)
@@ -152,6 +157,10 @@ return function()
 	input.InputBegan:Fire(key("Enter"), false)
 	assert(segmented:getValue() == "low")
 	segmented:setDisabled(false)
+	segmentedStyle.Frame.Position = Vector2.new(-10, -10)
+	segmentedStyle.Frame.Size = Vector2.new(1, 1)
+	segmentedStyle.Option.Position = Vector2.new(-20, -20)
+	segmentedStyle.Option.Size = Vector2.new(2, 2)
 	local layoutChanges = #changes
 	segmented:setLayout({
 		Position = Vector2.new(140, 10),
@@ -164,6 +173,8 @@ return function()
 			}
 		end,
 	})
+	assert(canvas:getElements()[1]:get("Position") == Vector2.new(140, 10))
+	assert(canvas:getElements()[1]:get("Size") == Vector2.new(100, 60))
 	assert(canvas:getElements()[2]:get("Position") == Vector2.new(140, 10))
 	assert(canvas:getElements()[2]:get("Size") == Vector2.new(100, 30))
 	assert(canvas:getElements()[5]:get("Position") == Vector2.new(150, 44))
@@ -176,35 +187,48 @@ return function()
 	assert(canvas:getElements()[4]:get("Size") == Vector2.new(50, 20))
 	assert(#changes == layoutChanges)
 
+	segmentedPointerDown = 0
 	canvas:dispatchPointer(pointer("down", 195, 15))
+	assert(segmentedPointerDown == 1)
 	segmented:setVisible(false)
 	canvas:dispatchPointer(pointer("up", 195, 15))
 	assert(segmented:getValue() == "low" and #changes == layoutChanges)
 	assert(canvas:getFocusedElement() == nil)
+	assert(not canvas:getElements()[2]:isInteractive())
+	canvas:dispatchPointer(pointer("down", 195, 15))
+	canvas:dispatchPointer(pointer("up", 195, 15))
+	assert(segmentedPointerDown == 1 and canvas:getFocusedElement() == nil)
+	assert(segmented:getValue() == "low" and #changes == layoutChanges)
 	for index = 1, 5 do
 		assert(canvas:getElements()[index]:get("Visible") == false)
 	end
 	segmented:setVisible(true)
 	assert(canvas:getElements()[2]:get("Visible") == true)
+	assert(canvas:getElements()[2]:get("Position") == Vector2.new(140, 10))
+	assert(canvas:getElements()[2]:isInteractive())
 	segmented:setDisabled(true)
 	segmented:setVisible(false)
 	segmented:setVisible(true)
 	assert(segmented:getState() == "disabled" and segmented:getValue() == "low")
+	assert(canvas:getElements()[1]:get("Position") == Vector2.new(140, 10))
+	assert(canvas:getElements()[4]:get("Position") == Vector2.new(190, 10))
 	segmented:setDisabled(false)
 
+	local keybindStyle = {
+		Frame = { Color = "frame" },
+		Focused = { Color = "focused" },
+		Listening = { Color = "listening" },
+		Disabled = { Transparency = 0.2 },
+		Label = { Color = "label" },
+		Value = {},
+	}
 	local keybind = runtime:createKeybindControl(canvas, {
 		Position = Vector2.new(10, 50),
 		Size = Vector2.new(120, 24),
 		ZIndex = 20,
 		Label = "Action",
 		Value = "Enum.KeyCode.RightShift",
-		Style = {
-			Frame = { Color = "frame" },
-			Focused = { Color = "focused" },
-			Listening = { Color = "listening" },
-			Disabled = { Transparency = 0.2 },
-			Label = { Color = "label" },
-		},
+		Style = keybindStyle,
 	})
 
 	local bindings = {}
@@ -245,6 +269,9 @@ return function()
 	input.InputBegan:Fire(key("F"), false)
 	assert(keybind:getValue() == nil)
 	keybind:setDisabled(false)
+	keybindStyle.Frame.Position = Vector2.new(-30, -30)
+	keybindStyle.Frame.Size = Vector2.new(3, 3)
+	keybindStyle.Value.Position = Vector2.new(-40, -40)
 	keybind:setLayout({
 		Position = Vector2.new(150, 50),
 		Size = Vector2.new(100, 24),
@@ -258,16 +285,30 @@ return function()
 	assert(canvas:getElements()[7]:get("Position") == Vector2.new(155, 54))
 	assert(canvas:getElements()[8]:get("Position") == Vector2.new(205, 54))
 	assert(#bindings == 2 and keybind:getValue() == nil)
+	local keybindPointerDown = 0
+	canvas:getElements()[6].PointerDown:Connect(function()
+		keybindPointerDown += 1
+	end)
 
 	canvas:dispatchPointer(pointer("down", 160, 60))
+	assert(keybindPointerDown == 1)
 	keybind:setVisible(false)
 	canvas:dispatchPointer(pointer("up", 160, 60))
 	assert(keybind:getState() == "idle" and keybind:getValue() == nil)
 	assert(canvas:getFocusedElement() == nil)
+	assert(not canvas:getElements()[6]:isInteractive())
+	canvas:dispatchPointer(pointer("down", 160, 60))
+	canvas:dispatchPointer(pointer("up", 160, 60))
+	assert(keybindPointerDown == 1 and canvas:getFocusedElement() == nil)
+	assert(not keybind:begin())
+	input.InputBegan:Fire(key("F"), false)
+	assert(keybind:getState() == "idle" and keybind:getValue() == nil and #bindings == 2)
 	for index = 6, 8 do
 		assert(canvas:getElements()[index]:get("Visible") == false)
 	end
 	keybind:setVisible(true)
+	assert(canvas:getElements()[6]:get("Position") == Vector2.new(150, 50))
+	assert(canvas:getElements()[8]:get("Position") == Vector2.new(205, 54))
 	keybind:begin()
 	assert(keybind:getState() == "listening")
 	keybind:setVisible(false)
@@ -275,6 +316,8 @@ return function()
 	keybind:setDisabled(true)
 	keybind:setVisible(true)
 	assert(keybind:getState() == "disabled" and keybind:getValue() == nil)
+	assert(canvas:getElements()[6]:get("Position") == Vector2.new(150, 50))
+	assert(canvas:getElements()[8]:get("Position") == Vector2.new(205, 54))
 	keybind:setDisabled(false)
 
 	canvas:dispatchPointer(pointer("down", 160, 60))

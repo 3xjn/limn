@@ -22,22 +22,33 @@ return function()
 			{ Value = "a", Label = "A" },
 			{ Value = "b", Label = "B" },
 		},
-		Style = {},
+		Style = {
+			Frame = { Position = Vector2.new(-1, -1), Size = Vector2.new(1, 1) },
+			Option = { Position = Vector2.new(-2, -2), Size = Vector2.new(2, 2) },
+		},
 	})
 	segmented:setLayout({ Position = Vector2.new(10, 20), Size = Vector2.new(100, 20) })
 	segmented:setVisible(false)
 	assert(canvas:getElements()[3]:get("Visible") == false)
 	segmented:setVisible(true)
+	assert(canvas:getElements()[2]:get("Position") == Vector2.new(10, 20))
+	assert(canvas:getElements()[3]:get("Position") == Vector2.new(10, 20))
 
 	local keybind = runtime:createKeybindControl(canvas, {
 		Position = Vector2.new(0, 50),
 		Size = Vector2.new(80, 20),
 		Value = "Q",
-		Style = {},
+		Style = {
+			Frame = { Position = Vector2.new(-3, -3), Size = Vector2.new(3, 3) },
+			Value = { Position = Vector2.new(-4, -4) },
+		},
 	})
 	keybind:setLayout({ Position = Vector2.new(10, 50), Size = Vector2.new(100, 20) })
 	keybind:setVisible(false)
 	assert(keybind:getValue() == "Q" and keybind:getState() == "idle")
+	keybind:setVisible(true)
+	assert(canvas:getElements()[7]:get("Position") == Vector2.new(10, 50))
+	assert(canvas:getElements()[8]:get("Position") == Vector2.new(60, 50))
 	canvas:destroy()
 	assert(fake.objects[1].removed)
 	for _, object in fake.objects do
