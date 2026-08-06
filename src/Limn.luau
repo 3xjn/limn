@@ -1,6 +1,7 @@
 --!strict
 
 local CanvasModule = require("./Canvas")
+local Controls = require("./Controls")
 
 export type ProcessedInputPolicy = "ignore" | "allow"
 
@@ -29,6 +30,8 @@ export type Options = {
 export type Limn = {
 	supportsPrimitive: (self: Limn, kind: string) -> boolean,
 	createCanvas: (self: Limn) -> CanvasModule.Canvas,
+	createSegmentedControl: (self: Limn, canvas: CanvasModule.Canvas, options: any) -> any,
+	createKeybindControl: (self: Limn, canvas: CanvasModule.Canvas, options: any) -> any,
 }
 
 type PrivateLimn = Limn & {
@@ -123,6 +126,14 @@ function Limn:createCanvas(): CanvasModule.Canvas
 	return CanvasModule.new(function(kind: string): any
 		return runtime:_createPrimitive(kind)
 	end, runtime._immediate, runtime._vector2, runtime._acceptProcessed, runtime._mapPosition)
+end
+
+function Limn:createSegmentedControl(canvas: CanvasModule.Canvas, options: any): any
+	return Controls.createSegmented(canvas, options, (self :: PrivateLimn)._vector2)
+end
+
+function Limn:createKeybindControl(canvas: CanvasModule.Canvas, options: any): any
+	return Controls.createKeybind(canvas, options, (self :: PrivateLimn)._vector2)
 end
 
 return Limn

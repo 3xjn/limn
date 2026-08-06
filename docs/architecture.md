@@ -107,7 +107,9 @@ This keeps the core useful for pure visuals while allowing a real interaction mo
   policy, not a one-time camera-size multiplication.
 - **No tween facade yet.** A correct scheduler needs cancellation, ownership, easing, and
   per-frame batching.
-- **No widgets in core.** Widgets need layout, theming, focus, and accessibility decisions first.
+- **No application widgets in core.** The optional generic controls layer owns only retained
+  segmented/keybind visuals, focus, and state; consumers own themes, labels, persistence, and
+  application behavior.
 - **No simulated input or game interaction.** Volt's input simulation and instance-event APIs are
   outside this library's presentation boundary.
 
@@ -120,6 +122,7 @@ This keeps the core useful for pure visuals while allowing a real interaction mo
 | `Element` | One retained drawing and its interaction signals |
 | `Geometry` | Pure hit-testing predicates |
 | `InputRouter` | Hover, capture, drag, release, and click semantics |
+| `Controls` | Generic retained segmented and keybind controls built from canvas elements |
 | `Signal` | Local event subscription lifecycle |
 
 `scripts/build.luau` bundles these source modules into `dist/Limn.lua` because Volt workspace

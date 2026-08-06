@@ -40,6 +40,8 @@ export type Canvas = {
 	) -> Element,
 	getElements: (self: Canvas) -> { Element },
 	dispatchPointer: (self: Canvas, event: PointerEvent) -> (),
+	focus: (self: Canvas, element: Element?) -> (),
+	getFocusedElement: (self: Canvas) -> Element?,
 	bindInput: (self: Canvas, inputService: InputService, vector2: any?) -> Connection,
 	paint: (self: Canvas, zIndex: number, callback: (any) -> ()) -> Connection,
 	paintCaptured: (
@@ -61,7 +63,10 @@ type PrivateCanvas = Canvas & {
 	_immediate: DrawingImmediate?,
 	_vector2: any?,
 	_mapPosition: MapPosition?,
+	_acceptProcessed: boolean,
 	_elements: { Element },
+	_focused: Element?,
+	_dispatchKey: (self: Canvas, input: any, processed: boolean) -> (),
 	_sequence: number,
 	_router: InputRouterModule.InputRouter,
 	_connections: { Connection },
@@ -87,7 +92,9 @@ function Canvas.new(
 		_immediate = immediate,
 		_vector2 = vector2,
 		_mapPosition = mapPosition,
+		_acceptProcessed = acceptProcessed == true,
 		_elements = {},
+		_focused = nil,
 		_sequence = 0,
 		_connections = {},
 		_destroyed = false,
@@ -130,6 +137,9 @@ function Canvas:create(kind: string, properties: Properties?, options: CreateOpt
 		canvas._sequence,
 		options ~= nil and options.interactive == true,
 		function()
+			if canvas._focused == element then
+				canvas:focus(nil)
+			end
 			canvas._router:releaseElement(element)
 			local index = table.find(canvas._elements, element)
 			if index then
@@ -138,6 +148,11 @@ function Canvas:create(kind: string, properties: Properties?, options: CreateOpt
 		end
 	)
 	table.insert(canvas._elements, element)
+	element.PointerDown:Connect(function()
+		if element:isFocusable() then
+			canvas:focus(element)
+		end
+	end)
 
 	if properties then
 		element:patch(properties)
@@ -151,6 +166,69 @@ end
 
 function Canvas:dispatchPointer(event: PointerEvent)
 	(self :: PrivateCanvas)._router:dispatch(event)
+end
+
+function Canvas:focus(element: Element?)
+	local canvas = self :: PrivateCanvas
+	if canvas._destroyed and element then
+		return
+	end
+	if element then
+		assert(table.find(canvas._elements, element), "focus element must belong to this canvas")
+		assert(element:isFocusable(), "focus element must be alive and focusable")
+	end
+
+	local previous = canvas._focused
+	if previous == element then
+		return
+	end
+	canvas._focused = element
+	if previous then
+		previous.FocusLost:Fire()
+	end
+	if element then
+		element.Focused:Fire()
+	end
+end
+
+function Canvas:getFocusedElement(): Element?
+	local canvas = self :: PrivateCanvas
+	local focused = canvas._focused
+	if focused and (not focused:isAlive() or not focused:isFocusable()) then
+		canvas:focus(nil)
+		return nil
+	end
+	return focused
+end
+
+local function normalizedKey(input: any): string?
+	local keyCode = input.KeyCode
+	if keyCode == nil then
+		return nil
+	end
+	local name = keyCode.Name
+	if type(name) == "string" and name ~= "Unknown" then
+		return name
+	end
+	local text = tostring(keyCode)
+	local lastDot = string.match(text, ".*()%.%")
+	local fallback = if lastDot then string.sub(text, lastDot + 1) else text
+	if fallback == "" or fallback == "Unknown" then
+		return nil
+	end
+	return fallback
+end
+
+function Canvas:_dispatchKey(input: any, processed: boolean)
+	local canvas = self :: PrivateCanvas
+	if canvas._destroyed or (processed and not canvas._acceptProcessed) then
+		return
+	end
+	local focused = canvas:getFocusedElement()
+	local key = normalizedKey(input)
+	if focused and key then
+		focused.KeyDown:Fire(input, key)
+	end
 end
 
 local function inputPosition(input: any, vector2: any, mapPosition: MapPosition?): Point
@@ -187,6 +265,8 @@ function Canvas:bindInput(inputService: InputService, vector2: any?): Connection
 					pointerId = pointerId(input),
 					processed = processed,
 				})
+			elseif kind:find("Keyboard", 1, true) then
+				canvas:_dispatchKey(input, processed)
 			end
 		end),
 		inputService.InputChanged:Connect(function(input: any, processed: boolean)

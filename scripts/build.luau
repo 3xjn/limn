@@ -8,6 +8,7 @@ local MODULES = {
 	"Element",
 	"InputRouter",
 	"Canvas",
+	"Controls",
 	"Limn",
 }
 

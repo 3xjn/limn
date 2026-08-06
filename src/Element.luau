@@ -13,12 +13,17 @@ export type Element = {
 	PointerUp: Signal.Signal,
 	Clicked: Signal.Signal,
 	Dragged: Signal.Signal,
+	Focused: Signal.Signal,
+	FocusLost: Signal.Signal,
+	KeyDown: Signal.Signal,
 	set: (self: Element, property: string, value: any) -> Element,
 	patch: (self: Element, properties: Properties) -> Element,
 	get: (self: Element, property: string) -> any,
 	getObject: (self: Element) -> any,
 	setInteractive: (self: Element, interactive: boolean) -> Element,
 	isInteractive: (self: Element) -> boolean,
+	setFocusable: (self: Element, focusable: boolean) -> Element,
+	isFocusable: (self: Element) -> boolean,
 	contains: (self: Element, point: Geometry.Point, padding: number?) -> boolean,
 	isAlive: (self: Element) -> boolean,
 	destroy: (self: Element) -> (),
@@ -28,6 +33,7 @@ type PrivateElement = Element & {
 	_object: any,
 	_sequence: number,
 	_interactive: boolean,
+	_focusable: boolean,
 	_alive: boolean,
 	_onDestroy: (Element) -> (),
 }
@@ -50,9 +56,13 @@ function Element.new(
 		PointerUp = Signal.new(),
 		Clicked = Signal.new(),
 		Dragged = Signal.new(),
+		Focused = Signal.new(),
+		FocusLost = Signal.new(),
+		KeyDown = Signal.new(),
 		_object = object,
 		_sequence = sequence,
 		_interactive = interactive,
+		_focusable = false,
 		_alive = true,
 		_onDestroy = onDestroy,
 	}, Element) :: any
@@ -96,6 +106,18 @@ function Element:isInteractive(): boolean
 	return self._alive and self._interactive
 end
 
+function Element:setFocusable(focusable: boolean): Element
+	local self = self :: PrivateElement
+	assert(self._alive, "cannot update a destroyed element")
+	self._focusable = focusable
+	return self
+end
+
+function Element:isFocusable(): boolean
+	local self = self :: PrivateElement
+	return self._alive and self._focusable
+end
+
 function Element:contains(point: Geometry.Point, padding: number?): boolean
 	local self = self :: PrivateElement
 	if not self._alive or self._object.Visible == false or self._object.Transparency == 0 then
@@ -123,6 +145,9 @@ function Element:destroy()
 	self.PointerUp:Destroy()
 	self.Clicked:Destroy()
 	self.Dragged:Destroy()
+	self.Focused:Destroy()
+	self.FocusLost:Destroy()
+	self.KeyDown:Destroy()
 end
 
 return Element

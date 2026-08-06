@@ -81,6 +81,75 @@ canvas:paintCaptured(card, 6, function(painter, event)
 	capturedPaints += 1
 	capturedPosition = event.position
 end)
+
+local segmented = runtime:createSegmentedControl(canvas, {
+	Position = Vector2.new(8, 64),
+	Size = Vector2.new(120, 24),
+	ZIndex = 7,
+	Options = {
+		{ Value = "low", Label = "Low" },
+		{ Value = "high", Label = "High" },
+	},
+	Value = "low",
+	Style = {
+		Frame = { Visible = true, Filled = true },
+		Option = { Visible = true, Filled = true },
+		Label = { Visible = true },
+	},
+})
+local segmentedChanges = 0
+segmented.Changed:Connect(function()
+	segmentedChanges += 1
+end)
+canvas:dispatchPointer({
+	phase = "down",
+	position = Vector2.new(100, 76),
+	pointerId = "manual-segment",
+	processed = false,
+})
+canvas:dispatchPointer({
+	phase = "up",
+	position = Vector2.new(100, 76),
+	pointerId = "manual-segment",
+	processed = false,
+})
+assert(segmented:getValue() == "high" and segmentedChanges == 1)
+input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Left" } }, false)
+input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Enter" } }, false)
+assert(segmented:getValue() == "low" and segmentedChanges == 2)
+
+local keybind = runtime:createKeybindControl(canvas, {
+	Position = Vector2.new(8, 96),
+	Size = Vector2.new(120, 24),
+	ZIndex = 7,
+	Label = "Action",
+	Value = "RightShift",
+	Style = {
+		Frame = { Visible = true, Filled = true },
+		Label = { Visible = true },
+		Value = { Visible = true },
+	},
+})
+canvas:dispatchPointer({
+	phase = "down",
+	position = Vector2.new(20, 108),
+	pointerId = "manual-keybind",
+	processed = false,
+})
+canvas:dispatchPointer({
+	phase = "up",
+	position = Vector2.new(20, 108),
+	pointerId = "manual-keybind",
+	processed = false,
+})
+assert(keybind:getState() == "listening")
+input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Q" } }, false)
+assert(keybind:getValue() == "Q" and keybind:getDisplayValue() == "Q")
+keybind:begin()
+input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Escape" } }, false)
+assert(keybind:getValue() == "Q")
+keybind:clear()
+assert(keybind:getValue() == nil)
 input.InputBegan:Fire(mouse, true)
 input.InputEnded:Fire(mouse, true)
 paintSignal:Fire()
@@ -100,11 +169,14 @@ paintSignal:Fire()
 assert(clicks == 1)
 assert(capturedPaints == 1)
 canvas:destroy()
-assert(fake.objects[1].removed)
-assert(fake.objects[2].removed)
+for _, object in fake.objects do
+	assert(object.removed)
+end
 input.InputBegan:Fire(mouse, false)
 input.InputEnded:Fire(mouse, false)
+input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "G" } }, false)
 paintSignal:Fire()
 assert(clicks == 1)
 assert(capturedPaints == 1)
-print("MANUAL PASS bundled capability -> captured paint -> mapped input -> cleanup")
+assert(keybind:getValue() == nil)
+print("MANUAL PASS bundled controls -> focus -> keyboard rebind -> captured paint -> cleanup")

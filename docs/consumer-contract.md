@@ -128,3 +128,76 @@ canvas:destroy()
 
 Keep one canvas for each independently reloadable overlay. Call `canvas:destroy()` before replacing
 that overlay; destruction removes retained drawings and disconnects input and paint callbacks.
+
+## Focus and keyboard input
+
+Call `element:setFocusable(true)` for a retained interactive element that should receive keyboard
+input. Pointer-down on that element focuses it. The canvas exposes `focus(element?)` and
+`getFocusedElement()` for programmatic focus management. Focusable elements publish `Focused`,
+`FocusLost`, and `KeyDown(input, normalizedKey)` signals.
+
+Keyboard dispatch is part of `canvas:bindInput()` and follows the same processed-input policy as
+pointer dispatch: processed input is ignored unless `Input.Processed = "allow"`. Destroying an
+element or its canvas releases focus before its signals are cleaned up.
+
+## Generic retained controls
+
+Controls require `Vector2` in `Limn.new()` and use the existing canvas and its `bindInput()`
+connection; they do not install another router. They own their retained drawings and connections,
+and their `destroy()` methods are idempotent. Destroying either a control or its canvas releases
+focus and pointer capture safely.
+
+```luau
+local quality = runtime:createSegmentedControl(canvas, {
+	Position = Vector2.new(24, 24),
+	Size = Vector2.new(240, 28),
+	ZIndex = 10,
+	Options = {
+		{ Value = "low", Label = "Low" },
+		{ Value = "high", Label = "High" },
+	},
+	Value = "low",
+	Style = style,
+})
+
+quality.Changed:Connect(function(value, previous, source)
+	-- source is "pointer", "keyboard", or "programmatic"
+end)
+```
+
+Segmented controls expose `Changed`, `StateChanged`, `getValue()`, `getState()`, `setValue(value)`,
+`setDisabled(boolean)`, and `destroy()`. Options are focusable retained squares: arrow keys move
+focus; Enter or Space activates the focused option. The default layout divides the supplied bounds
+horizontally. To supply layout, set `Layout(index, count, position, size)` to return `Position`,
+`Size`, and optionally `LabelPosition`.
+
+```luau
+local shortcut = runtime:createKeybindControl(canvas, {
+	Position = Vector2.new(24, 64),
+	Size = Vector2.new(240, 28),
+	ZIndex = 10,
+	Label = "Shortcut",
+	Value = "RightShift",
+	Style = style,
+	Layout = {
+		LabelPosition = Vector2.new(32, 70),
+		ValuePosition = Vector2.new(150, 70),
+	},
+})
+```
+
+Keybind controls expose `Changed`, `ListeningChanged`, `StateChanged`, `getValue()`,
+`getDisplayValue()`, `getState()`, `setValue(value)`, `begin()`, `cancel()`, `clear()`,
+`setDisabled(boolean)`, and `destroy()`. Click, Enter, or Space begins listening. Limn stores the
+canonical `KeyCode.Name` and also normalizes `Enum.KeyCode.Name` values. Escape cancels; Backspace
+or Delete clears. Keybind `Layout` accepts `LabelPosition` and `ValuePosition`.
+
+Provide labels through segmented `Options[].Label` and keybind `Label`, and provide retained drawing
+properties through style tables. The deterministic state overlays are `Frame`, `Option`,
+`Selected`, `Hovered`, `Focused`, `Listening`, `Disabled`, `Label`, and `Value` as applicable. Put
+each property that needs resetting in the base table as well as its state overlay.
+
+Consumers are responsible for making selected, focused, listening, and disabled states visibly
+distinct and for supplying meaningful labels. Limn supplies programmatic state and input
+affordances only: its drawing primitives are not Roblox `GuiObject`s and it makes no Roblox
+accessibility claim.

@@ -7,6 +7,8 @@
   ·
   <a href="examples/interactive.luau">Interactive example →</a>
   ·
+  <a href="examples/controls.luau">Controls example →</a>
+  ·
   <a href="docs/consumer-contract.md">Consumer contract →</a>
   ·
   <a href="docs/architecture.md">Architecture →</a>
@@ -26,6 +28,7 @@ so drawings and their properties stay familiar.
 | Retained drawings | Create and update lines, circles, squares, triangles, text, images, and quads. |
 | Per-frame drawing | Draw temporary guides, graphs, or overlays without creating retained objects. |
 | Opt-in interaction | Add hover, press, click, and drag signals only where you need them. |
+| Generic controls | Compose segmented selection and keybinding controls from retained drawings. |
 | Canvas cleanup | Remove owned drawings and disconnect input or paint callbacks with one call. |
 
 ---
@@ -74,6 +77,8 @@ The public runtime surface is intentionally small:
 | --- | --- |
 | `runtime:supportsPrimitive(kind)` | Detect and cache whether the injected backend can create a primitive. |
 | `runtime:createCanvas()` | Create an independently owned drawing and input lifecycle. |
+| `runtime:createSegmentedControl(canvas, options)` | Create a retained segmented-selection control. |
+| `runtime:createKeybindControl(canvas, options)` | Create a retained keyboard-rebinding control. |
 
 Capability detection probes `Drawing.new(kind)` and immediately removes the probe. A host with a
 side-effect-free capability API can inject it as `SupportsPrimitive`.
@@ -114,6 +119,8 @@ inset-mapping example for Universal Hub and Hydroxide.
 | `canvas:paint(zIndex, callback)` | Run `callback` every frame with Volt's `DrawingImmediate` API. |
 | `canvas:paintCaptured(element, zIndex, callback)` | Draw transient feedback only while `element` owns pointer capture. |
 | `canvas:bindInput(UserInputService)` | Enable pointer events for interactive elements. |
+| `canvas:focus(element?)` | Set or clear Limn's drawing-canvas keyboard focus. |
+| `canvas:getFocusedElement()` | Return the current focusable element, if any. |
 | `canvas:clear()` | Remove every retained element. |
 | `canvas:destroy()` | Clear the canvas and disconnect input and paint callbacks. |
 
@@ -139,6 +146,7 @@ Create an element with `{ interactive = true }`, then connect to the signals you
 | Hover | `PointerEntered`, `PointerLeft` |
 | Press | `PointerDown`, `PointerUp`, `Clicked` |
 | Drag | `Dragged` |
+| Keyboard focus | `Focused`, `FocusLost`, `KeyDown` |
 
 Each signal supports `Connect`, `Once`, and connection `Disconnect`.
 

@@ -5,6 +5,7 @@ local suites = {
 	{ name = "Canvas", run = require("./Canvas.spec") },
 	{ name = "InputRouter", run = require("./InputRouter.spec") },
 	{ name = "RuntimeAdapters", run = require("./RuntimeAdapters.spec") },
+	{ name = "Controls", run = require("./Controls.spec") },
 	{ name = "Bundle", run = require("./Bundle.spec") },
 }
 
