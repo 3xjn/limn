@@ -48,6 +48,7 @@ local quality = runtime:createSegmentedControl(canvas, {
 		{ Value = "high", Label = "High" },
 	},
 	Value = "medium",
+	CornerRadius = 6,
 	Style = style,
 })
 

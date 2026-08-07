@@ -159,6 +159,7 @@ local quality = runtime:createSegmentedControl(canvas, {
 		{ Value = "high", Label = "High" },
 	},
 	Value = "low",
+	CornerRadius = 6, -- optional; zero or omitted keeps the legacy square rendering
 	Style = style,
 })
 
@@ -173,6 +174,13 @@ focusable retained squares: arrow keys move focus; Enter or Space activates the 
 default layout divides the supplied bounds horizontally. `setLayout` replaces geometry completely:
 it requires `Position` and `Size`, and its optional `Layout(index, count, position, size)` returns
 `Position`, `Size`, and optionally `LabelPosition`; omitting `Layout` restores the default.
+`CornerRadius` is an optional nonnegative number. Omitted or zero keeps the exact legacy retained
+Square rendering; a positive value renders the frame and segment state with owned retained Squares
+and Circles, clamped to half of each current rectangle's width and height. Positive radii require
+retained `Circle` support and construction fails clearly when it is unavailable. Rounded geometry is
+visual only: segment hit, capture, focus, keyboard, and processed-input behavior remain rectangular
+over the existing segment bounds. Rounded helpers are owned by the control and never interactive or
+focusable.
 
 ```luau
 local shortcut = runtime:createKeybindControl(canvas, {

@@ -920,8 +920,17 @@ local Signal = __require("Signal")
 
 type Canvas = CanvasModule.Canvas
 type Element = ElementModule.Element
+type RoundedVisual = {
+	horizontal: Element,
+	vertical: Element,
+	topLeft: Element,
+	topRight: Element,
+	bottomLeft: Element,
+	bottomRight: Element,
+}
 
 local Controls = {}
+local HIT_TARGET_TRANSPARENCY = 0.001
 
 local function copy(properties: { [string]: any }?): { [string]: any }
 	return if properties then table.clone(properties) else {}
@@ -989,7 +998,32 @@ local function baseText(properties: { [string]: any }?, text: string, position: 
 	return result
 end
 
-function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): any
+local function baseCircle(
+	properties: { [string]: any }?,
+	position: any,
+	radius: number,
+	zIndex: number
+)
+	local result = copy(properties)
+	result.Position = position
+	result.Size = nil
+	result.Radius = radius
+	result.ZIndex = zIndex
+	if result.Visible == nil then
+		result.Visible = true
+	end
+	if result.Filled == nil then
+		result.Filled = true
+	end
+	return result
+end
+
+function Controls.createSegmented(
+	canvas: Canvas,
+	options: any,
+	vector2: any,
+	supportsPrimitive: ((kind: string) -> boolean)?
+): any
 	assert(type(options) == "table", "segmented control options are required")
 	assert(
 		type(options.Options) == "table" and #options.Options > 0,
@@ -997,6 +1031,17 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 	)
 	assert(options.Position and options.Size, "segmented control needs Position and Size")
 	assert(vector2, "segmented controls require Vector2 in Limn.new options")
+	local cornerRadius = if options.CornerRadius == nil then 0 else options.CornerRadius
+	assert(
+		type(cornerRadius) == "number" and cornerRadius >= 0,
+		"segmented CornerRadius must be a nonnegative number"
+	)
+	if cornerRadius > 0 then
+		assert(
+			supportsPrimitive and supportsPrimitive("Circle"),
+			"segmented CornerRadius requires Circle support"
+		)
+	end
 
 	local style = options.Style or {}
 	local values = options.Options
@@ -1022,10 +1067,37 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 	local owned: { Element } = {}
 	local segments: { Element } = {}
 	local labels: { Element? } = {}
+	local roundedSegments: { RoundedVisual? } = {}
 
 	local frame =
 		canvas:create("Square", baseSquare(style.Frame, position, size, options.ZIndex or 0))
 	table.insert(owned, frame)
+
+	local function own(element: Element): Element
+		table.insert(owned, element)
+		return element
+	end
+
+	local function createRoundedVisual(
+		horizontal: Element?,
+		properties: { [string]: any }?,
+		zIndex: number
+	): RoundedVisual
+		return {
+			horizontal = horizontal
+				or own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
+			vertical = own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
+			topLeft = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
+			topRight = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
+			bottomLeft = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
+			bottomRight = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
+		}
+	end
+
+	local roundedFrame: RoundedVisual? = nil
+	if cornerRadius > 0 then
+		roundedFrame = createRoundedVisual(frame, style.Frame, options.ZIndex or 0)
+	end
 
 	local control = {
 		Changed = changed,
@@ -1050,6 +1122,75 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		end
 	end
 
+	local function patchRoundedVisual(visual: RoundedVisual, properties: { [string]: any }?)
+		if not properties then
+			return
+		end
+		local visualProperties = copy(properties)
+		visualProperties.Position = nil
+		visualProperties.Size = nil
+		visualProperties.Radius = nil
+		visualProperties.ZIndex = nil
+		visualProperties.Visible = nil
+		patch(visual.horizontal, visualProperties)
+		patch(visual.vertical, visualProperties)
+		patch(visual.topLeft, visualProperties)
+		patch(visual.topRight, visualProperties)
+		patch(visual.bottomLeft, visualProperties)
+		patch(visual.bottomRight, visualProperties)
+	end
+
+	local function setRoundedVisible(visual: RoundedVisual, nextVisible: boolean)
+		visual.horizontal:set("Visible", nextVisible)
+		visual.vertical:set("Visible", nextVisible)
+		visual.topLeft:set("Visible", nextVisible)
+		visual.topRight:set("Visible", nextVisible)
+		visual.bottomLeft:set("Visible", nextVisible)
+		visual.bottomRight:set("Visible", nextVisible)
+	end
+
+	local function updateRoundedGeometry(
+		visual: RoundedVisual,
+		nextPosition: any,
+		nextSize: any,
+		zIndex: number
+	)
+		local radius = math.min(cornerRadius, nextSize.X / 2, nextSize.Y / 2)
+		visual.horizontal:patch({
+			Position = vector2.new(nextPosition.X + radius, nextPosition.Y),
+			Size = vector2.new(nextSize.X - radius * 2, nextSize.Y),
+			ZIndex = zIndex,
+		})
+		visual.vertical:patch({
+			Position = vector2.new(nextPosition.X, nextPosition.Y + radius),
+			Size = vector2.new(nextSize.X, nextSize.Y - radius * 2),
+			ZIndex = zIndex,
+		})
+		visual.topLeft:patch({
+			Position = vector2.new(nextPosition.X + radius, nextPosition.Y + radius),
+			Radius = radius,
+			ZIndex = zIndex,
+		})
+		visual.topRight:patch({
+			Position = vector2.new(nextPosition.X + nextSize.X - radius, nextPosition.Y + radius),
+			Radius = radius,
+			ZIndex = zIndex,
+		})
+		visual.bottomLeft:patch({
+			Position = vector2.new(nextPosition.X + radius, nextPosition.Y + nextSize.Y - radius),
+			Radius = radius,
+			ZIndex = zIndex,
+		})
+		visual.bottomRight:patch({
+			Position = vector2.new(
+				nextPosition.X + nextSize.X - radius,
+				nextPosition.Y + nextSize.Y - radius
+			),
+			Radius = radius,
+			ZIndex = zIndex,
+		})
+	end
+
 	local function updateSegment(index: number)
 		local segment = segments[index]
 		if not segment:isAlive() then
@@ -1067,6 +1208,24 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		end
 		if disabled then
 			patch(segment, style.Disabled)
+		end
+		local roundedVisual = roundedSegments[index]
+		if roundedVisual then
+			patchRoundedVisual(roundedVisual, style.Option)
+			if index == selectedIndex then
+				patchRoundedVisual(roundedVisual, style.Selected)
+			end
+			if index == hoveredIndex then
+				patchRoundedVisual(roundedVisual, style.Hovered)
+			end
+			if index == focusedIndex then
+				patchRoundedVisual(roundedVisual, style.Focused)
+			end
+			if disabled then
+				patchRoundedVisual(roundedVisual, style.Disabled)
+			end
+			setRoundedVisible(roundedVisual, visible)
+			segment:set("Transparency", HIT_TARGET_TRANSPARENCY)
 		end
 		segment:setInteractive(not disabled and visible)
 		segment:setFocusable(not disabled and visible)
@@ -1089,7 +1248,9 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 	end
 
 	local function updateGeometry()
-		if frame:isAlive() then
+		if roundedFrame then
+			updateRoundedGeometry(roundedFrame, position, size, options.ZIndex or 0)
+		elseif frame:isAlive() then
 			frame:patch({ Position = position, Size = size, ZIndex = options.ZIndex or 0 })
 		end
 		for index, segment in segments do
@@ -1100,6 +1261,15 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 					Size = segmentSize,
 					ZIndex = (options.ZIndex or 0) + 1,
 				})
+			end
+			local roundedVisual = roundedSegments[index]
+			if roundedVisual then
+				updateRoundedGeometry(
+					roundedVisual,
+					segmentPosition,
+					segmentSize,
+					(options.ZIndex or 0) + 1
+				)
 			end
 			local label = labels[index]
 			if label and label:isAlive() then
@@ -1112,7 +1282,13 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		for index = 1, #segments do
 			updateSegment(index)
 		end
-		if frame:isAlive() then
+		if roundedFrame then
+			patchRoundedVisual(roundedFrame, style.Frame)
+			if disabled then
+				patchRoundedVisual(roundedFrame, style.Disabled)
+			end
+			setRoundedVisible(roundedFrame, visible)
+		elseif frame:isAlive() then
 			patch(frame, style.Frame)
 			if disabled then
 				patch(frame, style.Disabled)
@@ -1166,6 +1342,10 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 		segment:setFocusable(not disabled and visible)
 		table.insert(owned, segment)
 		table.insert(segments, segment)
+		if cornerRadius > 0 then
+			roundedSegments[index] =
+				createRoundedVisual(nil, style.Option, (options.ZIndex or 0) + 1)
+		end
 
 		if option.Label ~= nil then
 			local label = canvas:create(
@@ -1710,7 +1890,15 @@ function Limn:createCanvas(): CanvasModule.Canvas
 end
 
 function Limn:createSegmentedControl(canvas: CanvasModule.Canvas, options: any): any
-	return Controls.createSegmented(canvas, options, (self :: PrivateLimn)._vector2)
+	local runtime = self :: PrivateLimn
+	return Controls.createSegmented(
+		canvas,
+		options,
+		runtime._vector2,
+		function(kind: string): boolean
+			return runtime:supportsPrimitive(kind)
+		end
+	)
 end
 
 function Limn:createKeybindControl(canvas: CanvasModule.Canvas, options: any): any

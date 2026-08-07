@@ -129,7 +129,15 @@ function Limn:createCanvas(): CanvasModule.Canvas
 end
 
 function Limn:createSegmentedControl(canvas: CanvasModule.Canvas, options: any): any
-	return Controls.createSegmented(canvas, options, (self :: PrivateLimn)._vector2)
+	local runtime = self :: PrivateLimn
+	return Controls.createSegmented(
+		canvas,
+		options,
+		runtime._vector2,
+		function(kind: string): boolean
+			return runtime:supportsPrimitive(kind)
+		end
+	)
 end
 
 function Limn:createKeybindControl(canvas: CanvasModule.Canvas, options: any): any

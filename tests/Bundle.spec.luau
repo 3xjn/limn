@@ -62,4 +62,68 @@ return function()
 	for _, object in fake.objects do
 		assert(object.removed)
 	end
+
+	local unsupportedFake = FakeDrawing.new()
+	local unsupportedRuntime = Limn.new({
+		Drawing = unsupportedFake.library,
+		Vector2 = Vector2,
+		SupportsPrimitive = function(kind: string): boolean
+			return kind ~= "Circle"
+		end,
+	})
+	local unsupportedCanvas = unsupportedRuntime:createCanvas()
+	local unsupportedOk, unsupportedMessage = pcall(function()
+		unsupportedRuntime:createSegmentedControl(unsupportedCanvas, {
+			Position = Vector2.new(0, 0),
+			Size = Vector2.new(20, 10),
+			CornerRadius = 4,
+			Options = { { Value = "a" } },
+		})
+	end)
+	assert(not unsupportedOk)
+	assert(
+		string.find(tostring(unsupportedMessage), "CornerRadius requires Circle support", 1, true)
+	)
+	assert(#unsupportedCanvas:getElements() == 0 and #unsupportedFake.objects == 0)
+
+	local roundedFake = FakeDrawing.new()
+	local roundedRuntime = Limn.new({ Drawing = roundedFake.library, Vector2 = Vector2 })
+	local roundedCanvas = roundedRuntime:createCanvas()
+	local rounded = roundedRuntime:createSegmentedControl(roundedCanvas, {
+		Position = Vector2.new(0, 40),
+		Size = Vector2.new(80, 20),
+		CornerRadius = 6,
+		Options = {
+			{ Value = "a", Label = "A" },
+			{ Value = "b", Label = "B" },
+		},
+		Value = "a",
+		Style = {
+			Option = { Color = "option" },
+			Selected = { Color = "selected" },
+			Label = { Color = "label" },
+			SelectedLabel = { Color = "selected-label" },
+		},
+	})
+	assert(#roundedCanvas:getElements() == 22)
+	assert(roundedCanvas:getElements()[3].Kind == "Circle")
+	assert(roundedCanvas:getElements()[3]:get("Position") == Vector2.new(6, 46))
+	assert(roundedCanvas:getElements()[3]:get("Radius") == 6)
+	assert(roundedCanvas:getElements()[14]:get("Color") == "selected-label")
+	rounded:setValue("b")
+	assert(roundedCanvas:getElements()[14]:get("Color") == "label")
+	assert(roundedCanvas:getElements()[22]:get("Color") == "selected-label")
+	rounded:setLayout({ Position = Vector2.new(10, 40), Size = Vector2.new(20, 8) })
+	assert(roundedCanvas:getElements()[3]:get("Position") == Vector2.new(14, 44))
+	assert(roundedCanvas:getElements()[3]:get("Radius") == 4)
+	rounded:setVisible(false)
+	for _, element in roundedCanvas:getElements() do
+		assert(element:get("Visible") == false)
+	end
+	rounded:setVisible(true)
+	assert(roundedCanvas:getElements()[22]:get("Color") == "selected-label")
+	roundedCanvas:destroy()
+	for _, object in roundedFake.objects do
+		assert(object.removed)
+	end
 end

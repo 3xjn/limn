@@ -59,6 +59,16 @@ local function key(name: string)
 	}
 end
 
+local function countKind(elements, kind: string): number
+	local count = 0
+	for _, element in elements do
+		if element.Kind == kind then
+			count += 1
+		end
+	end
+	return count
+end
+
 return function()
 	local fake = FakeDrawing.new()
 	local input = newInputService()
@@ -94,6 +104,203 @@ return function()
 	assert(receivedKey == "P")
 	focusTarget:destroy()
 	assert(canvas:getFocusedElement() == nil and focusLost == 1)
+
+	local zeroFake = FakeDrawing.new()
+	local zeroRuntime = Limn.new({ Drawing = zeroFake.library, Vector2 = Vector2 })
+	local zeroCanvas = zeroRuntime:createCanvas()
+	zeroRuntime:createSegmentedControl(zeroCanvas, {
+		Position = Vector2.new(0, 0),
+		Size = Vector2.new(80, 20),
+		Options = {
+			{ Value = "a", Label = "A" },
+			{ Value = "b", Label = "B" },
+		},
+		Value = "a",
+	})
+	local zeroControl = zeroRuntime:createSegmentedControl(zeroCanvas, {
+		Position = Vector2.new(0, 30),
+		Size = Vector2.new(80, 20),
+		CornerRadius = 0,
+		Options = {
+			{ Value = "a", Label = "A" },
+			{ Value = "b", Label = "B" },
+		},
+		Value = "a",
+	})
+	assert(#zeroCanvas:getElements() == 10)
+	assert(countKind(zeroCanvas:getElements(), "Square") == 6)
+	assert(countKind(zeroCanvas:getElements(), "Text") == 4)
+	assert(countKind(zeroCanvas:getElements(), "Circle") == 0)
+	assert(#zeroFake.objects == 10)
+	assert(zeroCanvas:getElements()[1]:get("Position") == Vector2.new(0, 0))
+	assert(zeroCanvas:getElements()[6]:get("Position") == Vector2.new(0, 30))
+	for index = 1, 5 do
+		local omitted = zeroCanvas:getElements()[index]
+		local explicitZero = zeroCanvas:getElements()[index + 5]
+		assert(omitted.Kind == explicitZero.Kind)
+		assert(omitted:get("Visible") == explicitZero:get("Visible"))
+		assert(omitted:get("ZIndex") == explicitZero:get("ZIndex"))
+		if omitted.Kind == "Square" then
+			assert(omitted:get("Size") == explicitZero:get("Size"))
+		end
+	end
+	zeroControl:destroy()
+	zeroCanvas:destroy()
+	for _, object in zeroFake.objects do
+		assert(object.removed)
+	end
+
+	local unsupportedFake = FakeDrawing.new()
+	local unsupportedRuntime = Limn.new({
+		Drawing = unsupportedFake.library,
+		Vector2 = Vector2,
+		SupportsPrimitive = function(kind: string): boolean
+			return kind ~= "Circle"
+		end,
+	})
+	local unsupportedCanvas = unsupportedRuntime:createCanvas()
+	local unsupportedOk, unsupportedMessage = pcall(function()
+		unsupportedRuntime:createSegmentedControl(unsupportedCanvas, {
+			Position = Vector2.new(0, 0),
+			Size = Vector2.new(20, 10),
+			CornerRadius = 4,
+			Options = { { Value = "a" } },
+		})
+	end)
+	assert(not unsupportedOk)
+	assert(
+		string.find(tostring(unsupportedMessage), "CornerRadius requires Circle support", 1, true)
+	)
+	assert(#unsupportedCanvas:getElements() == 0 and #unsupportedFake.objects == 0)
+
+	local roundedFake = FakeDrawing.new()
+	local roundedInput = newInputService()
+	local roundedRuntime = Limn.new({ Drawing = roundedFake.library, Vector2 = Vector2 })
+	local roundedCanvas = roundedRuntime:createCanvas()
+	roundedCanvas:bindInput(roundedInput)
+	local roundedChanges = 0
+	local rounded = roundedRuntime:createSegmentedControl(roundedCanvas, {
+		Position = Vector2.new(20, 100),
+		Size = Vector2.new(80, 20),
+		ZIndex = 40,
+		CornerRadius = 6,
+		Options = {
+			{ Value = "low", Label = "Low" },
+			{ Value = "high", Label = "High" },
+		},
+		Value = "low",
+		Style = {
+			Frame = { Color = "frame", Position = Vector2.new(-1, -1), Visible = false },
+			Option = { Color = "option", Position = Vector2.new(-2, -2), Size = Vector2.new(1, 1) },
+			Selected = { Color = "selected" },
+			Hovered = { Color = "hovered" },
+			Focused = { Transparency = 0.8 },
+			Disabled = { Color = "disabled", Transparency = 0.4 },
+			Label = { Color = "label", Position = Vector2.new(-3, -3), Visible = false },
+			SelectedLabel = {
+				Color = "selected-label",
+				Position = Vector2.new(-4, -4),
+				Visible = false,
+			},
+		},
+	})
+	rounded.Changed:Connect(function()
+		roundedChanges += 1
+	end)
+	assert(#roundedCanvas:getElements() == 22)
+	assert(countKind(roundedCanvas:getElements(), "Square") == 8)
+	assert(countKind(roundedCanvas:getElements(), "Circle") == 12)
+	assert(countKind(roundedCanvas:getElements(), "Text") == 2)
+	assert(roundedCanvas:getElements()[1]:get("Position") == Vector2.new(26, 100))
+	assert(roundedCanvas:getElements()[1]:get("Size") == Vector2.new(68, 20))
+	assert(roundedCanvas:getElements()[1]:get("ZIndex") == 40)
+	assert(roundedCanvas:getElements()[1]:get("Visible") == true)
+	assert(roundedCanvas:getElements()[2]:get("Position") == Vector2.new(20, 106))
+	assert(roundedCanvas:getElements()[2]:get("Size") == Vector2.new(80, 8))
+	assert(roundedCanvas:getElements()[3]:get("Position") == Vector2.new(26, 106))
+	assert(roundedCanvas:getElements()[3]:get("Radius") == 6)
+	assert(roundedCanvas:getElements()[7]:isInteractive())
+	assert(roundedCanvas:getElements()[7]:isFocusable())
+	assert(roundedCanvas:getElements()[8]:get("Position") == Vector2.new(26, 100))
+	assert(roundedCanvas:getElements()[8]:get("ZIndex") == 41)
+	assert(roundedCanvas:getElements()[8]:get("Visible") == true)
+	for index, element in roundedCanvas:getElements() do
+		if index == 7 or index == 15 then
+			assert(element:isInteractive() and element:isFocusable())
+		else
+			assert(not element:isInteractive() and not element:isFocusable())
+		end
+	end
+	assert(roundedCanvas:getElements()[14]:get("Color") == "selected-label")
+	assert(roundedCanvas:getElements()[14]:get("Position") == Vector2.new(20, 100))
+	assert(roundedCanvas:getElements()[14]:get("ZIndex") == 42)
+	assert(roundedCanvas:getElements()[14]:get("Visible") == true)
+	assert(roundedCanvas:getElements()[22]:get("Color") == "label")
+
+	local roundedPointerDown = 0
+	roundedCanvas:getElements()[7].PointerDown:Connect(function()
+		roundedPointerDown += 1
+	end)
+	roundedCanvas:dispatchPointer(pointer("down", 20, 100, true))
+	roundedCanvas:dispatchPointer(pointer("up", 20, 100, true))
+	assert(roundedPointerDown == 0 and roundedCanvas:getFocusedElement() == nil)
+	roundedCanvas:dispatchPointer(pointer("down", 20, 100))
+	roundedCanvas:dispatchPointer(pointer("up", 20, 100))
+	assert(
+		roundedPointerDown == 1
+			and roundedCanvas:getFocusedElement() == roundedCanvas:getElements()[7]
+	)
+	roundedCanvas:dispatchPointer(pointer("down", 60, 100))
+	roundedCanvas:dispatchPointer(pointer("up", 60, 100))
+	assert(rounded:getValue() == "high" and roundedChanges == 1)
+	assert(roundedCanvas:getElements()[17]:get("Color") == "hovered")
+	assert(roundedCanvas:getElements()[17]:get("Transparency") == 0.8)
+	assert(roundedCanvas:getElements()[22]:get("Color") == "selected-label")
+	rounded:setValue("low")
+	assert(roundedChanges == 2)
+	assert(roundedCanvas:getElements()[14]:get("Color") == "selected-label")
+	assert(roundedCanvas:getElements()[22]:get("Color") == "label")
+
+	rounded:setLayout({ Position = Vector2.new(10, 50), Size = Vector2.new(20, 8) })
+	assert(roundedCanvas:getElements()[1]:get("Position") == Vector2.new(14, 50))
+	assert(roundedCanvas:getElements()[1]:get("Size") == Vector2.new(12, 8))
+	assert(roundedCanvas:getElements()[2]:get("Position") == Vector2.new(10, 54))
+	assert(roundedCanvas:getElements()[2]:get("Size") == Vector2.new(20, 0))
+	assert(roundedCanvas:getElements()[3]:get("Position") == Vector2.new(14, 54))
+	assert(roundedCanvas:getElements()[3]:get("Radius") == 4)
+	assert(roundedCanvas:getElements()[7]:get("Position") == Vector2.new(10, 50))
+	assert(roundedCanvas:getElements()[7]:get("Size") == Vector2.new(10, 8))
+	assert(roundedCanvas:getElements()[8]:get("Position") == Vector2.new(14, 50))
+	assert(roundedCanvas:getElements()[10]:get("Radius") == 4)
+	assert(roundedCanvas:getElements()[14]:get("Position") == Vector2.new(10, 50))
+
+	rounded:setDisabled(true)
+	assert(roundedCanvas:getElements()[8]:get("Color") == "disabled")
+	assert(roundedCanvas:getElements()[8]:get("Transparency") == 0.4)
+	assert(roundedCanvas:getElements()[14]:get("Color") == "selected-label")
+	rounded:setDisabled(false)
+	roundedCanvas:dispatchPointer(pointer("down", 15, 54))
+	assert(roundedPointerDown == 2)
+	rounded:setVisible(false)
+	roundedCanvas:dispatchPointer(pointer("up", 15, 54))
+	assert(rounded:getValue() == "low" and roundedChanges == 2)
+	assert(roundedCanvas:getFocusedElement() == nil)
+	roundedCanvas:dispatchPointer(pointer("down", 15, 54))
+	roundedCanvas:dispatchPointer(pointer("up", 15, 54))
+	assert(roundedPointerDown == 2 and roundedCanvas:getFocusedElement() == nil)
+	for _, element in roundedCanvas:getElements() do
+		assert(element:get("Visible") == false)
+	end
+	rounded:setVisible(true)
+	assert(#roundedCanvas:getElements() == 22)
+	assert(roundedCanvas:getElements()[3]:get("Radius") == 4)
+	assert(roundedCanvas:getElements()[14]:get("Color") == "selected-label")
+	roundedCanvas:clear()
+	roundedCanvas:clear()
+	rounded:destroy()
+	for _, object in roundedFake.objects do
+		assert(object.removed)
+	end
 
 	local segmentedStyle = {
 		Frame = { Color = "frame" },

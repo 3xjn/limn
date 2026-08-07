@@ -135,6 +135,58 @@ segmented:setVisible(false)
 assert(segmented:getValue() == "low" and segmentedChanges == 2)
 segmented:setVisible(true)
 
+local rounded = runtime:createSegmentedControl(canvas, {
+	Position = Vector2.new(8, 192),
+	Size = Vector2.new(120, 24),
+	ZIndex = 7,
+	CornerRadius = 12,
+	Options = {
+		{ Value = "low", Label = "Low" },
+		{ Value = "high", Label = "High" },
+	},
+	Value = "low",
+	Style = {
+		Frame = { Color = "rounded-frame", Visible = true, Filled = true },
+		Option = { Color = "option", Visible = true, Filled = true },
+		Selected = { Color = "selected" },
+		Hovered = { Color = "hovered" },
+		Focused = { Transparency = 0.8 },
+		Disabled = { Color = "disabled", Transparency = 0.4 },
+		Label = { Color = "label", Visible = true },
+		SelectedLabel = { Color = "selected-label" },
+	},
+})
+assert(#canvas:getElements() == 28)
+assert(canvas:getElements()[9].Kind == "Circle" and canvas:getElements()[9]:get("Radius") == 12)
+canvas:dispatchPointer({
+	phase = "down",
+	position = Vector2.new(100, 204),
+	pointerId = "manual-rounded",
+	processed = false,
+})
+canvas:dispatchPointer({
+	phase = "up",
+	position = Vector2.new(100, 204),
+	pointerId = "manual-rounded",
+	processed = false,
+})
+assert(
+	rounded:getValue() == "high"
+		and canvas:getElements()[22]:get("Color") == "hovered"
+		and canvas:getElements()[28]:get("Color") == "selected-label"
+)
+rounded:setValue("low")
+rounded:setLayout({ Position = Vector2.new(8, 224), Size = Vector2.new(20, 8) })
+assert(canvas:getElements()[9]:get("Position") == Vector2.new(12, 228))
+assert(canvas:getElements()[9]:get("Radius") == 4)
+rounded:setDisabled(true)
+assert(canvas:getElements()[14]:get("Color") == "disabled")
+assert(canvas:getElements()[20]:get("Color") == "selected-label")
+rounded:setVisible(false)
+assert(canvas:getElements()[9]:get("Visible") == false)
+rounded:setVisible(true)
+assert(canvas:getElements()[20]:get("Color") == "selected-label")
+
 local keybind = runtime:createKeybindControl(canvas, {
 	Position = Vector2.new(8, 96),
 	Size = Vector2.new(120, 24),
@@ -205,5 +257,5 @@ assert(clicks == 1)
 assert(capturedPaints == 1)
 assert(keybind:getValue() == nil)
 print(
-	"MANUAL PASS bundled controls -> layout -> visibility -> keyboard rebind -> captured paint -> cleanup"
+	"MANUAL PASS bundled controls -> rounded layout/state -> visibility -> keyboard rebind -> captured paint -> cleanup"
 )
