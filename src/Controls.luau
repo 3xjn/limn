@@ -7,15 +7,18 @@ local Signal = require("./Signal")
 type Canvas = CanvasModule.Canvas
 type Element = ElementModule.Element
 type RoundedVisual = {
-	horizontal: Element,
-	vertical: Element,
-	topLeft: Element,
-	topRight: Element,
-	bottomLeft: Element,
-	bottomRight: Element,
+	center: Element,
+	top: Element,
+	bottom: Element,
+	left: Element,
+	right: Element,
+	triangles: { Element },
+	leftRounded: boolean,
+	rightRounded: boolean,
 }
 
 local Controls = {}
+local CORNER_SECTORS = 4
 local HIT_TARGET_TRANSPARENCY = 0.001
 
 local function copy(properties: { [string]: any }?): { [string]: any }
@@ -84,16 +87,20 @@ local function baseText(properties: { [string]: any }?, text: string, position: 
 	return result
 end
 
-local function baseCircle(
+local function baseTriangle(
 	properties: { [string]: any }?,
-	position: any,
-	radius: number,
+	pointA: any,
+	pointB: any,
+	pointC: any,
 	zIndex: number
 )
 	local result = copy(properties)
-	result.Position = position
+	result.Position = nil
 	result.Size = nil
-	result.Radius = radius
+	result.Radius = nil
+	result.PointA = pointA
+	result.PointB = pointB
+	result.PointC = pointC
 	result.ZIndex = zIndex
 	if result.Visible == nil then
 		result.Visible = true
@@ -124,8 +131,8 @@ function Controls.createSegmented(
 	)
 	if cornerRadius > 0 then
 		assert(
-			supportsPrimitive and supportsPrimitive("Circle"),
-			"segmented CornerRadius requires Circle support"
+			supportsPrimitive and supportsPrimitive("Triangle"),
+			"segmented CornerRadius requires Triangle support"
 		)
 	end
 
@@ -165,24 +172,40 @@ function Controls.createSegmented(
 	end
 
 	local function createRoundedVisual(
-		horizontal: Element?,
+		center: Element?,
 		properties: { [string]: any }?,
-		zIndex: number
+		zIndex: number,
+		leftRounded: boolean,
+		rightRounded: boolean
 	): RoundedVisual
-		return {
-			horizontal = horizontal
+		local visual = {
+			center = center
 				or own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
-			vertical = own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
-			topLeft = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
-			topRight = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
-			bottomLeft = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
-			bottomRight = own(canvas:create("Circle", baseCircle(properties, position, 0, zIndex))),
+			top = own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
+			bottom = own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
+			left = own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
+			right = own(canvas:create("Square", baseSquare(properties, position, size, zIndex))),
+			triangles = {},
+			leftRounded = leftRounded,
+			rightRounded = rightRounded,
 		}
+		for _ = 1, CORNER_SECTORS * 4 do
+			table.insert(
+				visual.triangles,
+				own(
+					canvas:create(
+						"Triangle",
+						baseTriangle(properties, position, position, position, zIndex)
+					)
+				)
+			)
+		end
+		return visual
 	end
 
 	local roundedFrame: RoundedVisual? = nil
 	if cornerRadius > 0 then
-		roundedFrame = createRoundedVisual(frame, style.Frame, options.ZIndex or 0)
+		roundedFrame = createRoundedVisual(frame, style.Frame, options.ZIndex or 0, true, true)
 	end
 
 	local control = {
@@ -216,23 +239,34 @@ function Controls.createSegmented(
 		visualProperties.Position = nil
 		visualProperties.Size = nil
 		visualProperties.Radius = nil
+		visualProperties.PointA = nil
+		visualProperties.PointB = nil
+		visualProperties.PointC = nil
 		visualProperties.ZIndex = nil
 		visualProperties.Visible = nil
-		patch(visual.horizontal, visualProperties)
-		patch(visual.vertical, visualProperties)
-		patch(visual.topLeft, visualProperties)
-		patch(visual.topRight, visualProperties)
-		patch(visual.bottomLeft, visualProperties)
-		patch(visual.bottomRight, visualProperties)
+		patch(visual.center, visualProperties)
+		patch(visual.top, visualProperties)
+		patch(visual.bottom, visualProperties)
+		patch(visual.left, visualProperties)
+		patch(visual.right, visualProperties)
+		for _, triangle in visual.triangles do
+			patch(triangle, visualProperties)
+		end
 	end
 
 	local function setRoundedVisible(visual: RoundedVisual, nextVisible: boolean)
-		visual.horizontal:set("Visible", nextVisible)
-		visual.vertical:set("Visible", nextVisible)
-		visual.topLeft:set("Visible", nextVisible)
-		visual.topRight:set("Visible", nextVisible)
-		visual.bottomLeft:set("Visible", nextVisible)
-		visual.bottomRight:set("Visible", nextVisible)
+		visual.center:set("Visible", nextVisible)
+		visual.top:set("Visible", nextVisible)
+		visual.bottom:set("Visible", nextVisible)
+		visual.left:set("Visible", nextVisible)
+		visual.right:set("Visible", nextVisible)
+		for index, triangle in visual.triangles do
+			local corner = math.ceil(index / CORNER_SECTORS)
+			local rounded = if corner == 1 or corner == 4
+				then visual.leftRounded
+				else visual.rightRounded
+			triangle:set("Visible", nextVisible and rounded)
+		end
 	end
 
 	local function updateRoundedGeometry(
@@ -242,39 +276,94 @@ function Controls.createSegmented(
 		zIndex: number
 	)
 		local radius = math.min(cornerRadius, nextSize.X / 2, nextSize.Y / 2)
-		visual.horizontal:patch({
-			Position = vector2.new(nextPosition.X + radius, nextPosition.Y),
-			Size = vector2.new(nextSize.X - radius * 2, nextSize.Y),
-			ZIndex = zIndex,
-		})
-		visual.vertical:patch({
-			Position = vector2.new(nextPosition.X, nextPosition.Y + radius),
-			Size = vector2.new(nextSize.X, nextSize.Y - radius * 2),
-			ZIndex = zIndex,
-		})
-		visual.topLeft:patch({
-			Position = vector2.new(nextPosition.X + radius, nextPosition.Y + radius),
-			Radius = radius,
-			ZIndex = zIndex,
-		})
-		visual.topRight:patch({
-			Position = vector2.new(nextPosition.X + nextSize.X - radius, nextPosition.Y + radius),
-			Radius = radius,
-			ZIndex = zIndex,
-		})
-		visual.bottomLeft:patch({
-			Position = vector2.new(nextPosition.X + radius, nextPosition.Y + nextSize.Y - radius),
-			Radius = radius,
-			ZIndex = zIndex,
-		})
-		visual.bottomRight:patch({
-			Position = vector2.new(
-				nextPosition.X + nextSize.X - radius,
-				nextPosition.Y + nextSize.Y - radius
+		local leftRadius = if visual.leftRounded then radius else 0
+		local rightRadius = if visual.rightRounded then radius else 0
+		local verticalRadius = if leftRadius > 0 or rightRadius > 0 then radius else 0
+		visual.center:patch({
+			Position = vector2.new(nextPosition.X + leftRadius, nextPosition.Y + verticalRadius),
+			Size = vector2.new(
+				nextSize.X - leftRadius - rightRadius,
+				nextSize.Y - verticalRadius * 2
 			),
-			Radius = radius,
 			ZIndex = zIndex,
 		})
+		visual.top:patch({
+			Position = vector2.new(nextPosition.X + leftRadius, nextPosition.Y),
+			Size = vector2.new(nextSize.X - leftRadius - rightRadius, verticalRadius),
+			ZIndex = zIndex,
+		})
+		visual.bottom:patch({
+			Position = vector2.new(
+				nextPosition.X + leftRadius,
+				nextPosition.Y + nextSize.Y - verticalRadius
+			),
+			Size = vector2.new(nextSize.X - leftRadius - rightRadius, verticalRadius),
+			ZIndex = zIndex,
+		})
+		visual.left:patch({
+			Position = vector2.new(nextPosition.X, nextPosition.Y + verticalRadius),
+			Size = vector2.new(leftRadius, nextSize.Y - verticalRadius * 2),
+			ZIndex = zIndex,
+		})
+		visual.right:patch({
+			Position = vector2.new(
+				nextPosition.X + nextSize.X - rightRadius,
+				nextPosition.Y + verticalRadius
+			),
+			Size = vector2.new(rightRadius, nextSize.Y - verticalRadius * 2),
+			ZIndex = zIndex,
+		})
+		local function updateFan(
+			firstIndex: number,
+			center: any,
+			startAngle: number,
+			endAngle: number
+		)
+			local step = (endAngle - startAngle) / CORNER_SECTORS
+			for offset = 0, CORNER_SECTORS - 1 do
+				local from = startAngle + step * offset
+				local to = from + step
+				visual.triangles[firstIndex + offset]:patch({
+					PointA = center,
+					PointB = vector2.new(
+						center.X + math.cos(from) * radius,
+						center.Y + math.sin(from) * radius
+					),
+					PointC = vector2.new(
+						center.X + math.cos(to) * radius,
+						center.Y + math.sin(to) * radius
+					),
+					ZIndex = zIndex,
+				})
+			end
+		end
+		updateFan(
+			1,
+			vector2.new(nextPosition.X + leftRadius, nextPosition.Y + verticalRadius),
+			-math.pi / 2,
+			-math.pi
+		)
+		updateFan(
+			CORNER_SECTORS + 1,
+			vector2.new(nextPosition.X + nextSize.X - rightRadius, nextPosition.Y + verticalRadius),
+			-math.pi / 2,
+			0
+		)
+		updateFan(
+			CORNER_SECTORS * 2 + 1,
+			vector2.new(
+				nextPosition.X + nextSize.X - rightRadius,
+				nextPosition.Y + nextSize.Y - verticalRadius
+			),
+			0,
+			math.pi / 2
+		)
+		updateFan(
+			CORNER_SECTORS * 3 + 1,
+			vector2.new(nextPosition.X + leftRadius, nextPosition.Y + nextSize.Y - verticalRadius),
+			math.pi / 2,
+			math.pi
+		)
 	end
 
 	local function updateSegment(index: number)
@@ -429,8 +518,13 @@ function Controls.createSegmented(
 		table.insert(owned, segment)
 		table.insert(segments, segment)
 		if cornerRadius > 0 then
-			roundedSegments[index] =
-				createRoundedVisual(nil, style.Option, (options.ZIndex or 0) + 1)
+			roundedSegments[index] = createRoundedVisual(
+				nil,
+				style.Option,
+				(options.ZIndex or 0) + 1,
+				index == 1,
+				index == #values
+			)
 		end
 
 		if option.Label ~= nil then

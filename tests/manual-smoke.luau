@@ -156,8 +156,11 @@ local rounded = runtime:createSegmentedControl(canvas, {
 		SelectedLabel = { Color = "selected-label" },
 	},
 })
-assert(#canvas:getElements() == 28)
-assert(canvas:getElements()[9].Kind == "Circle" and canvas:getElements()[9]:get("Radius") == 12)
+assert(#canvas:getElements() == 73)
+assert(
+	canvas:getElements()[12].Kind == "Triangle"
+		and canvas:getElements()[12]:get("PointA") == Vector2.new(20, 204)
+)
 canvas:dispatchPointer({
 	phase = "down",
 	position = Vector2.new(100, 204),
@@ -172,20 +175,19 @@ canvas:dispatchPointer({
 })
 assert(
 	rounded:getValue() == "high"
-		and canvas:getElements()[22]:get("Color") == "hovered"
-		and canvas:getElements()[28]:get("Color") == "selected-label"
+		and canvas:getElements()[52]:get("Color") == "hovered"
+		and canvas:getElements()[73]:get("Color") == "selected-label"
 )
 rounded:setValue("low")
 rounded:setLayout({ Position = Vector2.new(8, 224), Size = Vector2.new(20, 8) })
-assert(canvas:getElements()[9]:get("Position") == Vector2.new(12, 228))
-assert(canvas:getElements()[9]:get("Radius") == 4)
+assert(canvas:getElements()[12]:get("PointA") == Vector2.new(12, 228))
 rounded:setDisabled(true)
-assert(canvas:getElements()[14]:get("Color") == "disabled")
-assert(canvas:getElements()[20]:get("Color") == "selected-label")
+assert(canvas:getElements()[29]:get("Color") == "disabled")
+assert(canvas:getElements()[50]:get("Color") == "selected-label")
 rounded:setVisible(false)
-assert(canvas:getElements()[9]:get("Visible") == false)
+assert(canvas:getElements()[12]:get("Visible") == false)
 rounded:setVisible(true)
-assert(canvas:getElements()[20]:get("Color") == "selected-label")
+assert(canvas:getElements()[50]:get("Color") == "selected-label")
 
 local keybind = runtime:createKeybindControl(canvas, {
 	Position = Vector2.new(8, 96),

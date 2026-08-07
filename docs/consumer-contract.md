@@ -176,11 +176,13 @@ it requires `Position` and `Size`, and its optional `Layout(index, count, positi
 `Position`, `Size`, and optionally `LabelPosition`; omitting `Layout` restores the default.
 `CornerRadius` is an optional nonnegative number. Omitted or zero keeps the exact legacy retained
 Square rendering; a positive value renders the frame and segment state with owned retained Squares
-and Circles, clamped to half of each current rectangle's width and height. Positive radii require
-retained `Circle` support and construction fails clearly when it is unavailable. Rounded geometry is
-visual only: segment hit, capture, focus, keyboard, and processed-input behavior remain rectangular
-over the existing segment bounds. Rounded helpers are owned by the control and never interactive or
-focusable.
+and Triangle corner sectors, clamped to half of each current rectangle's width and height. Positive
+radii require retained `Triangle` support and construction fails clearly when it is unavailable. The
+rectangles and corner sectors meet only at boundaries, so semi-transparent styles retain uniform
+opacity. For multiple segments, only the control's outer ends are rounded; internal joins stay
+square. Rounded geometry is visual only: segment hit, capture, focus, keyboard, and processed-input
+behavior remain rectangular over the existing segment bounds. Rounded helpers are owned by the
+control and never interactive or focusable.
 
 ```luau
 local shortcut = runtime:createKeybindControl(canvas, {
