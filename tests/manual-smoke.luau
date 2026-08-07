@@ -94,7 +94,8 @@ local segmented = runtime:createSegmentedControl(canvas, {
 	Style = {
 		Frame = { Visible = true, Filled = true },
 		Option = { Visible = true, Filled = true },
-		Label = { Visible = true },
+		Label = { Color = "label", Visible = true },
+		SelectedLabel = { Color = "selected-label" },
 	},
 })
 local segmentedChanges = 0
@@ -113,10 +114,19 @@ canvas:dispatchPointer({
 	pointerId = "manual-segment",
 	processed = false,
 })
-assert(segmented:getValue() == "high" and segmentedChanges == 1)
+assert(
+	segmented:getValue() == "high"
+		and segmentedChanges == 1
+		and canvas:getElements()[6]:get("Color") == "selected-label"
+)
 input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Left" } }, false)
 input.InputBegan:Fire({ UserInputType = "Keyboard", KeyCode = { Name = "Enter" } }, false)
-assert(segmented:getValue() == "low" and segmentedChanges == 2)
+assert(
+	segmented:getValue() == "low"
+		and segmentedChanges == 2
+		and canvas:getElements()[4]:get("Color") == "selected-label"
+		and canvas:getElements()[6]:get("Color") == "label"
+)
 segmented:setLayout({
 	Position = Vector2.new(8, 128),
 	Size = Vector2.new(120, 24),

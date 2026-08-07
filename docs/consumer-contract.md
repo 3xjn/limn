@@ -204,8 +204,14 @@ it does not restore focus, capture, or listening. These lifecycle operations nev
 
 Provide labels through segmented `Options[].Label` and keybind `Label`, and provide retained drawing
 properties through style tables. The deterministic state overlays are `Frame`, `Option`,
-`Selected`, `Hovered`, `Focused`, `Listening`, `Disabled`, `Label`, and `Value` as applicable. Put
-each property that needs resetting in the base table as well as its state overlay.
+`Selected`, `Hovered`, `Focused`, `Listening`, `Disabled`, `Label`, `SelectedLabel`, and `Value` as
+applicable. A segmented square applies `Option` → `Selected` → `Hovered` → `Focused` → `Disabled`.
+Its existing text label applies `Label` and then `SelectedLabel` only when its option is selected;
+`Label` is reapplied first on every refresh, so deselection restores every property provided by
+`Label`. Label selection is independent of square hover, focus, and disabled styling. Control-owned
+`Position`, `ZIndex`, and `Visible` are restored after style patches, so label styles cannot override
+layout or visibility. Put each property that needs resetting in the base table as well as its state
+overlay.
 
 Consumers are responsible for making selected, focused, listening, and disabled states visibly
 distinct and for supplying meaningful labels. Limn supplies programmatic state and input

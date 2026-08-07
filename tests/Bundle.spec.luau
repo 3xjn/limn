@@ -25,6 +25,8 @@ return function()
 		Style = {
 			Frame = { Position = Vector2.new(-1, -1), Size = Vector2.new(1, 1) },
 			Option = { Position = Vector2.new(-2, -2), Size = Vector2.new(2, 2) },
+			Label = { Color = "label", Position = Vector2.new(-3, -3), Visible = false },
+			SelectedLabel = { Color = "selected", Position = Vector2.new(-4, -4), Visible = false },
 		},
 	})
 	segmented:setLayout({ Position = Vector2.new(10, 20), Size = Vector2.new(100, 20) })
@@ -33,6 +35,12 @@ return function()
 	segmented:setVisible(true)
 	assert(canvas:getElements()[2]:get("Position") == Vector2.new(10, 20))
 	assert(canvas:getElements()[3]:get("Position") == Vector2.new(10, 20))
+	assert(canvas:getElements()[4]:get("Color") == "selected")
+	assert(canvas:getElements()[4]:get("Position") == Vector2.new(10, 20))
+	assert(canvas:getElements()[4]:get("Visible") == true)
+	segmented:setValue("b")
+	assert(canvas:getElements()[4]:get("Color") == "label")
+	assert(canvas:getElements()[6]:get("Color") == "selected")
 
 	local keybind = runtime:createKeybindControl(canvas, {
 		Position = Vector2.new(0, 50),

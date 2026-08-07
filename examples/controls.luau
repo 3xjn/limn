@@ -22,6 +22,7 @@ local style = {
 		Visible = true,
 	},
 	Selected = { Color = Color3.fromRGB(78, 126, 214) },
+	SelectedLabel = { Color = Color3.fromRGB(255, 255, 255) },
 	Focused = { Transparency = 0.85 },
 	Listening = { Color = Color3.fromRGB(224, 168, 73) },
 	Disabled = { Transparency = 0.35 },

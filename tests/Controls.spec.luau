@@ -99,9 +99,23 @@ return function()
 		Frame = { Color = "frame" },
 		Option = { Color = "option" },
 		Selected = { Color = "selected" },
+		Hovered = { Color = "hovered" },
 		Focused = { Transparency = 0.8 },
 		Disabled = { Transparency = 0.2 },
-		Label = { Color = "label" },
+		Label = {
+			Color = "label",
+			Transparency = 0.25,
+			Position = Vector2.new(-50, -50),
+			ZIndex = 500,
+			Visible = false,
+		},
+		SelectedLabel = {
+			Color = "selected-label",
+			Transparency = 0.75,
+			Position = Vector2.new(-60, -60),
+			ZIndex = 600,
+			Visible = false,
+		},
 	}
 	local segmented = runtime:createSegmentedControl(canvas, {
 		Position = Vector2.new(10, 10),
@@ -129,6 +143,16 @@ return function()
 	assert(fake.objects[3].ZIndex == 11)
 	assert(fake.objects[5].ZIndex == 11)
 	assert(canvas:getElements()[4]:contains(Vector2.new(105, 20)))
+	assert(#canvas:getElements() == 5)
+	assert(canvas:getElements()[3]:get("Color") == "selected-label")
+	assert(canvas:getElements()[3]:get("Transparency") == 0.75)
+	assert(canvas:getElements()[3]:get("Position") == Vector2.new(10, 10))
+	assert(
+		canvas:getElements()[3]:get("ZIndex") == 12
+			and canvas:getElements()[3]:get("Visible") == true
+	)
+	assert(canvas:getElements()[5]:get("Color") == "label")
+	assert(canvas:getElements()[5]:get("Transparency") == 0.25)
 
 	canvas:dispatchPointer(pointer("down", 105, 20))
 	assert(canvas:getFocusedElement() ~= nil)
@@ -141,16 +165,34 @@ return function()
 	)
 	assert(canvas:getFocusedElement() ~= nil)
 	assert(segmented:getState() == "focused")
+	assert(canvas:getElements()[4]:get("Color") == "hovered")
+	assert(canvas:getElements()[4]:get("Transparency") == 0.8)
+	assert(canvas:getElements()[5]:get("Color") == "selected-label")
+	assert(canvas:getElements()[5]:get("Transparency") == 0.75)
+	assert(canvas:getElements()[3]:get("Color") == "label")
+	assert(#canvas:getElements() == 5)
 
-	input.InputBegan:Fire(key("Left"), true)
-	assert(segmented:getValue() == "high")
-	input.InputBegan:Fire(key("Left"), false)
-	input.InputBegan:Fire(key("Enter"), false)
+	segmented:setValue("low")
+	assert(changes[2].source == "programmatic")
+	assert(canvas:getElements()[3]:get("Color") == "selected-label")
+	assert(canvas:getElements()[5]:get("Color") == "label")
+	assert(#canvas:getElements() == 5)
+
+	input.InputBegan:Fire(key("Right"), true)
 	assert(segmented:getValue() == "low")
-	assert(changes[2].source == "keyboard")
+	input.InputBegan:Fire(key("Right"), false)
+	input.InputBegan:Fire(key("Enter"), false)
+	assert(segmented:getValue() == "high")
+	assert(changes[3].source == "keyboard")
+	assert(canvas:getElements()[5]:get("Color") == "selected-label")
+	segmented:setValue("low")
+	assert(changes[4].source == "programmatic")
 
 	segmented:setDisabled(true)
 	assert(segmented:getState() == "disabled")
+	assert(canvas:getElements()[2]:get("Color") == "selected")
+	assert(canvas:getElements()[2]:get("Transparency") == 0.2)
+	assert(canvas:getElements()[3]:get("Color") == "selected-label")
 	canvas:dispatchPointer(pointer("down", 105, 20))
 	canvas:dispatchPointer(pointer("up", 105, 20))
 	input.InputBegan:Fire(key("Right"), false)
@@ -161,6 +203,12 @@ return function()
 	segmentedStyle.Frame.Size = Vector2.new(1, 1)
 	segmentedStyle.Option.Position = Vector2.new(-20, -20)
 	segmentedStyle.Option.Size = Vector2.new(2, 2)
+	segmentedStyle.Label.Position = Vector2.new(-70, -70)
+	segmentedStyle.Label.ZIndex = 700
+	segmentedStyle.Label.Visible = false
+	segmentedStyle.SelectedLabel.Position = Vector2.new(-80, -80)
+	segmentedStyle.SelectedLabel.ZIndex = 800
+	segmentedStyle.SelectedLabel.Visible = false
 	local layoutChanges = #changes
 	segmented:setLayout({
 		Position = Vector2.new(140, 10),
@@ -177,6 +225,11 @@ return function()
 	assert(canvas:getElements()[1]:get("Size") == Vector2.new(100, 60))
 	assert(canvas:getElements()[2]:get("Position") == Vector2.new(140, 10))
 	assert(canvas:getElements()[2]:get("Size") == Vector2.new(100, 30))
+	assert(canvas:getElements()[3]:get("Position") == Vector2.new(150, 14))
+	assert(
+		canvas:getElements()[3]:get("ZIndex") == 12
+			and canvas:getElements()[3]:get("Visible") == true
+	)
 	assert(canvas:getElements()[5]:get("Position") == Vector2.new(150, 44))
 	assert(#changes == layoutChanges and segmented:getValue() == "low")
 	segmented:setLayout({
@@ -206,12 +259,16 @@ return function()
 	assert(canvas:getElements()[2]:get("Visible") == true)
 	assert(canvas:getElements()[2]:get("Position") == Vector2.new(140, 10))
 	assert(canvas:getElements()[2]:isInteractive())
+	assert(canvas:getElements()[3]:get("Color") == "selected-label")
+	assert(canvas:getElements()[3]:get("Position") == Vector2.new(140, 10))
+	assert(canvas:getElements()[3]:get("Visible") == true)
 	segmented:setDisabled(true)
 	segmented:setVisible(false)
 	segmented:setVisible(true)
 	assert(segmented:getState() == "disabled" and segmented:getValue() == "low")
 	assert(canvas:getElements()[1]:get("Position") == Vector2.new(140, 10))
 	assert(canvas:getElements()[4]:get("Position") == Vector2.new(190, 10))
+	assert(canvas:getElements()[3]:get("Color") == "selected-label")
 	segmented:setDisabled(false)
 
 	local keybindStyle = {

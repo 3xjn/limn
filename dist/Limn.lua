@@ -1119,8 +1119,12 @@ function Controls.createSegmented(canvas: Canvas, options: any, vector2: any): a
 			end
 			frame:set("Visible", visible)
 		end
-		for _, label in labels do
+		for index, label in labels do
 			if label and label:isAlive() then
+				patch(label, style.Label)
+				if index == selectedIndex then
+					patch(label, style.SelectedLabel)
+				end
 				label:set("Visible", visible)
 			end
 		end
